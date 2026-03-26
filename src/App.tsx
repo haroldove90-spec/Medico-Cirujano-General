@@ -169,18 +169,22 @@ const ActionMenu = ({
           className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          <button 
-            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Eye size={16} className="text-brand-primary" /> Ver Detalle
-          </button>
-          <button 
-            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Edit2 size={16} className="text-amber-500" /> Editar Registro
-          </button>
+          {userRole === 'admin' && (
+            <>
+              <button 
+                onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Eye size={16} className="text-brand-primary" /> Ver Detalle
+              </button>
+              <button 
+                onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Edit2 size={16} className="text-amber-500" /> Editar Registro
+              </button>
+            </>
+          )}
           <button 
             onClick={() => { exportToPDF(`Registro_${patient.nombre}`); setActiveMenu(null); }}
             className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -301,7 +305,7 @@ export default function App() {
       { id: 'dashboard', roles: ['admin', 'asistente'] },
       { id: 'agenda', roles: ['admin', 'asistente'] },
       { id: 'pacientes', roles: ['admin', 'asistente'] },
-      { id: 'historial', roles: ['admin', 'asistente'] },
+      { id: 'historial', roles: ['admin'] },
       { id: 'perfil', roles: ['admin', 'asistente'] },
     ];
     
@@ -500,76 +504,115 @@ export default function App() {
       return patients.filter(p => p.proximaCita?.startsWith(dateStr));
     };
 
+    const isToday = (day: number) => {
+      const today = new Date();
+      return day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+    };
+
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
-              {monthNames[month]} <span className="text-brand-primary">{year}</span>
-            </h3>
+      <div className="p-0">
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-[32px]">
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col">
+              <h3 className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                {monthNames[month]} <span className="text-brand-primary">{year}</span>
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Gestión de Agenda Quirúrgica</p>
+            </div>
             {userRole === 'asistente' && (
               <button 
                 onClick={() => setShowFullCalendar(false)}
-                className="text-[10px] font-bold text-brand-primary uppercase tracking-widest hover:underline"
+                className="px-4 py-2 bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-all"
               >
-                Volver a Lista
+                ← Volver a Lista
               </button>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
+              <button 
+                onClick={() => setCurrentDate(new Date(year, month - 1, 1))} 
+                className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-500"
+              >
+                <ChevronRight size={18} className="rotate-180" />
+              </button>
+              <button 
+                onClick={() => setCurrentDate(new Date())} 
+                className="px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-brand-primary transition-colors"
+              >
+                Hoy
+              </button>
+              <button 
+                onClick={() => setCurrentDate(new Date(year, month + 1, 1))} 
+                className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-500"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
             {userRole === 'asistente' && (
               <button 
                 onClick={() => setIsAddingAppointment(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-primary/90 transition-all active:scale-95 shadow-md shadow-brand-primary/20"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20"
               >
-                <Plus size={14} /> Nueva Cita
+                <Plus size={16} /> Nueva Cita
               </button>
             )}
             <button 
               onClick={exportAgendaPDF}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+              className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all"
+              title="Exportar Agenda"
             >
-              <Download size={14} /> PDF
+              <Download size={18} />
             </button>
-            <div className="flex gap-2">
-              <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                <ChevronRight size={20} className="rotate-180" />
-              </button>
-              <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                <ChevronRight size={20} />
-              </button>
-            </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => (
-            <div key={d} className="bg-slate-50 p-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-              {d}
+        <div className="grid grid-cols-7 bg-slate-50">
+          {["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"].map(d => (
+            <div key={d} className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-r border-b border-slate-100 last:border-r-0">
+              {d.substring(0, 3)}
             </div>
           ))}
           {days.map((day, i) => {
             const appointments = day ? getAppointmentsForDay(day) : [];
+            const today = isToday(day || 0);
+            
             return (
               <div key={i} className={cn(
-                "bg-white min-h-[100px] md:min-h-[120px] p-2 transition-colors hover:bg-slate-50/50",
-                !day && "bg-slate-50/30"
+                "min-h-[120px] md:min-h-[150px] p-3 border-r border-b border-slate-100 last:border-r-0 transition-all group relative",
+                !day ? "bg-slate-50/50" : "bg-white hover:bg-slate-50/30"
               )}>
                 {day && (
                   <>
-                    <p className={cn(
-                      "text-xs font-bold mb-2 w-6 h-6 flex items-center justify-center rounded-full",
-                      day === 26 && month === 2 && year === 2026 ? "bg-brand-primary text-white" : "text-slate-400"
-                    )}>{day}</p>
-                    <div className="space-y-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={cn(
+                        "text-xs font-black w-7 h-7 flex items-center justify-center rounded-lg transition-all",
+                        today ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/30 scale-110" : "text-slate-400 group-hover:text-slate-600"
+                      )}>
+                        {day}
+                      </span>
+                      {appointments.length > 0 && (
+                        <span className="text-[9px] font-black text-brand-primary/40 uppercase tracking-widest">
+                          {appointments.length} {appointments.length === 1 ? 'Cita' : 'Citas'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
                       {appointments.map((app, idx) => (
-                        <div 
+                        <motion.div 
                           key={idx} 
+                          whileHover={{ x: 4 }}
                           onClick={() => handleEdit(app)}
-                          className="p-1.5 bg-brand-primary/10 border-l-2 border-brand-primary rounded text-[9px] font-bold text-brand-primary truncate cursor-pointer hover:bg-brand-primary/20 transition-colors"
+                          className={cn(
+                            "p-2 rounded-lg text-[9px] font-bold truncate cursor-pointer transition-all border-l-4",
+                            app.prioridad === 'alta' ? "bg-red-50 text-red-600 border-red-500 hover:bg-red-100" :
+                            app.prioridad === 'media' ? "bg-amber-50 text-amber-600 border-amber-500 hover:bg-amber-100" :
+                            "bg-brand-primary/5 text-brand-primary border-brand-primary hover:bg-brand-primary/10"
+                          )}
                         >
-                          {app.proximaCita?.split(' ')[1]} {app.nombre}
-                        </div>
+                          <span className="font-mono opacity-60 mr-1">{app.proximaCita?.split(' ')[1]}</span>
+                          {app.nombre}
+                        </motion.div>
                       ))}
                     </div>
                   </>
@@ -748,59 +791,85 @@ export default function App() {
     }
 
     return (
-      <Card className="p-0">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">Agenda de Consultas</h3>
-          <div className="flex items-center gap-4">
+      <Card className="p-0 border-none shadow-xl shadow-slate-200/50">
+        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-[32px]">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Agenda de Consultas</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Listado diario de pacientes programados</p>
+          </div>
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsAddingAppointment(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-brand-primary/90 transition-all active:scale-95 shadow-md shadow-brand-primary/20"
+              className="flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20 active:scale-95"
             >
               <Plus size={16} /> Nueva Cita
             </button>
             <button 
               onClick={exportAgendaPDF}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+              className="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all"
             >
-              <Download size={14} /> PDF
+              <Download size={18} />
             </button>
             <button 
               onClick={() => setShowFullCalendar(true)}
-              className="text-xs font-bold text-brand-primary hover:underline"
+              className="px-4 py-3 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
             >
-              Ver Calendario Completo
+              Calendario
             </button>
           </div>
         </div>
         <div className="divide-y divide-slate-50">
-          {patients.map((p, i) => (
-            <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+          {patients.length > 0 ? patients.map((p, i) => (
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="p-8 flex items-center justify-between hover:bg-slate-50/50 transition-all group"
+            >
+              <div className="flex items-center gap-8">
+                <div className="flex flex-col items-center justify-center bg-slate-50 w-20 h-20 rounded-2xl border border-slate-100 group-hover:border-brand-primary/30 group-hover:bg-brand-primary/5 transition-all">
+                  <p className="text-2xl font-black text-slate-900 tracking-tighter font-mono">{p.proximaCita?.split(' ')[1].split(':')[0]}:{p.proximaCita?.split(' ')[1].split(':')[1]}</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">HRS</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-black text-slate-900 tracking-tight group-hover:text-brand-primary transition-colors">{p.nombre}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{p.diagnostico}</p>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.sexo} • {p.edad} años</p>
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-6">
-                <div className="text-center min-w-[60px]">
-                  <p className="text-xl font-black text-slate-900">{p.proximaCita?.split(' ')[1].split(':')[0]}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AM</p>
+                <div className="text-right hidden sm:block">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Riesgo Quirúrgico</p>
+                  <Badge variant="asa">{p.asa}</Badge>
                 </div>
-                <div className="h-10 w-[1px] bg-slate-200" />
-                <div>
-                  <p className="font-bold text-slate-800">{p.nombre}</p>
-                  <p className="text-xs text-slate-500">{p.diagnostico}</p>
+                <div className="h-12 w-[1px] bg-slate-100" />
+                <div className="flex items-center gap-4">
+                  <Badge variant={p.prioridad}>{p.prioridad}</Badge>
+                  <ActionMenu 
+                    patient={p} 
+                    module="agenda" 
+                    activeMenu={activeMenu}
+                    setActiveMenu={setActiveMenu}
+                    handleEdit={handleEdit}
+                    handleDelete={handleDelete}
+                    exportToPDF={exportToPDF}
+                    userRole={userRole}
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <Badge variant={p.prioridad}>{p.prioridad}</Badge>
-                <ActionMenu 
-                  patient={p} 
-                  module="agenda" 
-                  activeMenu={activeMenu}
-                  setActiveMenu={setActiveMenu}
-                  handleEdit={handleEdit}
-                  handleDelete={handleDelete}
-                  exportToPDF={exportToPDF}
-                  userRole={userRole}
-                />
+            </motion.div>
+          )) : (
+            <div className="p-20 text-center">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Calendar size={32} className="text-slate-200" />
               </div>
+              <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No hay citas programadas</p>
             </div>
-          ))}
+          )}
         </div>
       </Card>
     );
@@ -832,7 +901,7 @@ export default function App() {
             >
               <Download size={18} /> Exportar PDF
             </button>
-            {(userRole === 'admin' || userRole === 'asistente') && (
+            {userRole === 'admin' && (
               <button 
                 onClick={() => {
                   setEditingPatient({ 
@@ -1569,7 +1638,7 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'asistente'] },
     { id: 'agenda', label: 'Agenda', icon: Calendar, roles: ['admin', 'asistente'] },
     { id: 'pacientes', label: 'Pacientes', icon: Users, roles: ['admin', 'asistente'] },
-    { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin', 'asistente'] },
+    { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin'] },
     { id: 'perfil', label: 'Perfil y Config', icon: Settings, roles: ['admin', 'asistente'] },
   ].filter(item => item.roles.includes(userRole));
 
@@ -1724,7 +1793,7 @@ export default function App() {
               {activeTab === 'dashboard' && MetricsView()}
               {activeTab === 'agenda' && AgendaView()}
               {activeTab === 'pacientes' && PatientsView()}
-              {activeTab === 'historial' && ClinicalHistoryView()}
+              {activeTab === 'historial' && userRole === 'admin' && ClinicalHistoryView()}
               {activeTab === 'perfil' && ProfileView()}
             </motion.div>
           </AnimatePresence>
