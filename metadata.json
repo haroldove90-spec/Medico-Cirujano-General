@@ -1,5 +1,5 @@
 {
-  "name": "CirujanoIA - Asistente Quirúrgico",
+  "name": "Médico Cirujano Gral.",
   "description": "Asistente médico inteligente para estructuración de notas quirúrgicas, cálculo de riesgos y gestión de pacientes.",
   "requestFramePermissions": [
     "microphone"
