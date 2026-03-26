@@ -27,8 +27,8 @@ import {
   Stethoscope,
   Download
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { cn } from './lib/utils';
 
 // --- Types & Constants ---
@@ -69,42 +69,60 @@ interface Patient {
 const MOCK_DATA: Patient[] = [
   {
     id: '1',
-    nombre: 'Juan Pérez',
+    nombre: 'Juan Pérez García',
     edad: 45,
     sexo: 'Masculino',
-    diagnostico: 'Colecistitis Aguda',
+    diagnostico: 'Colecistitis Crónica Litiásica',
     fechaIngreso: '2026-03-20',
-    prioridad: 'alta',
-    padecimiento: 'Dolor abdominal en hipocondrio derecho de 6 horas de evolución.',
-    exploracion: 'Murphy positivo, ruidos intestinales disminuidos.',
+    prioridad: 'media',
     asa: 'ASA II',
-    proximaCita: '2026-03-27 09:00'
+    padecimiento: 'Dolor abdominal tipo cólico en hipocondrio derecho de 12 horas de evolución, irradiado a región escapular derecha.',
+    exploracion: 'Murphy positivo, abdomen blando, depresible, doloroso a la palpación profunda en hipocondrio derecho.',
+    signosVitales: { ta: '120/80', fc: '72', fr: '18', temp: '36.5', satO2: '98' },
+    proximaCita: '2026-03-26 09:00',
+    consentimientoInformado: true,
+    antecedentesQuirurgicos: 'Apendicectomía hace 10 años',
+    alergias: 'Negadas',
+    comorbilidades: 'Hipertensión Arterial Controlada',
+    ultimaIngesta: '6 horas de ayuno'
   },
   {
     id: '2',
-    nombre: 'María García',
+    nombre: 'María Rodríguez Sosa',
     edad: 32,
     sexo: 'Femenino',
-    diagnostico: 'Hernia Inguinal',
+    diagnostico: 'Hernia Inguinal Derecha',
     fechaIngreso: '2026-03-22',
-    prioridad: 'media',
-    padecimiento: 'Aumento de volumen en región inguinal derecha al esfuerzo.',
-    exploracion: 'Tumoración reductible en canal inguinal.',
+    prioridad: 'baja',
     asa: 'ASA I',
-    proximaCita: '2026-03-28 11:30'
+    padecimiento: 'Aumento de volumen en región inguinal derecha de 3 meses de evolución, que aumenta al esfuerzo físico.',
+    exploracion: 'Tumoración reductible en región inguinal derecha, maniobra de Valsalva positiva.',
+    signosVitales: { ta: '110/70', fc: '68', fr: '16', temp: '36.2', satO2: '99' },
+    proximaCita: '2026-03-26 11:30',
+    consentimientoInformado: true,
+    antecedentesQuirurgicos: 'Cesárea previa',
+    alergias: 'Penicilina',
+    comorbilidades: 'Ninguna',
+    ultimaIngesta: '8 horas de ayuno'
   },
   {
     id: '3',
-    nombre: 'Roberto Sánchez',
+    nombre: 'Roberto Gómez Luna',
     edad: 68,
     sexo: 'Masculino',
-    diagnostico: 'Apendicitis Fase II',
+    diagnostico: 'Apendicitis Aguda',
     fechaIngreso: '2026-03-25',
     prioridad: 'alta',
-    padecimiento: 'Dolor periumbilical que migra a fosa iliaca derecha.',
-    exploracion: 'McBurney positivo, rebote positivo.',
     asa: 'ASA III',
-    proximaCita: '2026-03-26 14:00'
+    padecimiento: 'Dolor periumbilical que migra a fosa iliaca derecha de 24 horas de evolución, acompañado de náuseas.',
+    exploracion: 'McBurney positivo, rebote positivo, resistencia muscular en fosa iliaca derecha.',
+    signosVitales: { ta: '135/85', fc: '92', fr: '22', temp: '38.2', satO2: '96' },
+    proximaCita: '2026-03-26 14:00',
+    consentimientoInformado: true,
+    antecedentesQuirurgicos: 'Ninguno',
+    alergias: 'Negadas',
+    comorbilidades: 'Diabetes Mellitus Tipo 2',
+    ultimaIngesta: '4 horas de ayuno'
   }
 ];
 
@@ -137,11 +155,23 @@ export default function App() {
   const [userRole, setUserRole] = useState<UserRole>('asistente');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [showNotification, setShowNotification] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [formTab, setFormTab] = useState(0);
+
+  const [isAddingAppointment, setIsAddingAppointment] = useState(false);
+  const [newAppointment, setNewAppointment] = useState<Partial<Patient>>({
+    nombre: '',
+    edad: 0,
+    sexo: 'Masculino',
+    diagnostico: '',
+    prioridad: 'baja',
+    proximaCita: new Date().toISOString().split('T')[0] + ' 09:00',
+    asa: 'ASA I'
+  });
 
   // Persistence Logic
   useEffect(() => {
@@ -189,32 +219,37 @@ export default function App() {
 
   // PDF Export
   const exportToPDF = (title: string = 'Listado de Pacientes', data?: any[][], headers?: string[]) => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(title, 14, 20);
-    doc.setFontSize(10);
-    doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 14, 28);
-    
-    const defaultHeaders = ['Nombre', 'Edad', 'Sexo', 'Diagnóstico', 'Prioridad', 'ASA'];
-    const defaultData = patients.map(p => [
-      p.nombre,
-      p.edad,
-      p.sexo,
-      p.diagnostico,
-      p.prioridad.toUpperCase(),
-      p.asa
-    ]);
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text(title, 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 14, 28);
+      
+      const defaultHeaders = ['Nombre', 'Edad', 'Sexo', 'Diagnóstico', 'Prioridad', 'ASA'];
+      const defaultData = patients.map(p => [
+        p.nombre,
+        p.edad,
+        p.sexo,
+        p.diagnostico,
+        p.prioridad.toUpperCase(),
+        p.asa
+      ]);
 
-    (doc as any).autoTable({
-      head: [headers || defaultHeaders],
-      body: data || defaultData,
-      startY: 35,
-      theme: 'grid',
-      headStyles: { fillStyle: '#2563eb', textColor: '#ffffff' },
-      alternateRowStyles: { fillStyle: '#f8fafc' }
-    });
+      autoTable(doc, {
+        head: [headers || defaultHeaders],
+        body: data || defaultData,
+        startY: 35,
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [248, 250, 252] }
+      });
 
-    doc.save(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
+      doc.save(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
+    } catch (error) {
+      console.error('Error al exportar PDF:', error);
+      alert('Hubo un error al generar el PDF. Por favor, intente de nuevo.');
+    }
   };
 
   const exportAgendaPDF = () => {
@@ -258,81 +293,114 @@ export default function App() {
   };
 
   // Views
-  const MetricsView = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Cirugías', value: '124', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Pacientes Mes', value: '48', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Riesgos Altos', value: '12', icon: ShieldAlert, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: 'Pendientes', value: '08', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-        ].map((stat, i) => (
-          <motion.div 
-            key={i} 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ delay: i * 0.1 }}
-          >
-            <Card className="p-6 hover:shadow-md transition-shadow cursor-default group">
-              <div className="flex items-center justify-between mb-4">
-                <div className={cn("p-3 rounded-xl transition-transform group-hover:scale-110", stat.bg, stat.color)}>
-                  <stat.icon size={24} />
-                </div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live</span>
-              </div>
-              <p className="text-3xl font-black text-slate-900 mb-1">{stat.value}</p>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-            <Calendar size={18} className="text-blue-600" /> Próximas Intervenciones
-          </h3>
-          <div className="space-y-4">
-            {patients.slice(0, 3).map((p, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-blue-600">
-                    {p.nombre.charAt(0)}
+  const MetricsView = () => {
+    const totalPatients = patients.length;
+    const highRisk = patients.filter(p => p.asa === 'ASA III' || p.asa === 'ASA IV').length;
+    const today = new Date().toISOString().split('T')[0];
+    const todayAppointments = patients.filter(p => p.proximaCita?.startsWith(today)).length;
+    const monthPatients = patients.filter(p => {
+      const date = p.fechaIngreso || '';
+      return date.startsWith('2026-03'); // Hardcoded for demo month
+    }).length;
+
+    const stats = [
+      { label: 'Total Pacientes', value: totalPatients.toString().padStart(2, '0'), icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { label: 'Ingresos Mes', value: monthPatients.toString().padStart(2, '0'), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { label: 'Riesgos Altos', value: highRisk.toString().padStart(2, '0'), icon: ShieldAlert, color: 'text-red-600', bg: 'bg-red-50' },
+      { label: 'Citas Hoy', value: todayAppointments.toString().padStart(2, '0'), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+    ];
+
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map((stat, i) => (
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: i * 0.1 }}
+            >
+              <Card className="p-6 hover:shadow-lg transition-all cursor-default group border-none shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={cn("p-3 rounded-xl transition-transform group-hover:scale-110", stat.bg, stat.color)}>
+                    <stat.icon size={24} />
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">{p.nombre}</p>
-                    <p className="text-xs text-slate-500">{p.diagnostico}</p>
-                  </div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">En Vivo</span>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-900">{p.proximaCita?.split(' ')[1]}</p>
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">Hoy</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+                <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">{stat.value}</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
         
-        <Card className="p-6 bg-slate-900 text-white border-none">
-          <h3 className="font-bold mb-6 flex items-center gap-2">
-            <TrendingUp size={18} className="text-blue-400" /> Rendimiento Quirúrgico
-          </h3>
-          <div className="h-48 flex items-end justify-between gap-2 px-4">
-            {[40, 70, 45, 90, 65, 85, 55].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: `${h}%` }}
-                  className="w-full bg-blue-500/20 border-t-2 border-blue-400 rounded-t-sm"
-                />
-                <span className="text-[10px] text-slate-500 font-bold uppercase">D{i+1}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="lg:col-span-2 p-8 border-none shadow-md">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Actividad Quirúrgica</h3>
+                <p className="text-xs text-slate-500 font-bold">Distribución de procedimientos por día</p>
               </div>
-            ))}
-          </div>
-        </Card>
+              <div className="flex gap-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" /> Realizadas
+                </span>
+              </div>
+            </div>
+            <div className="h-64 flex items-end justify-between gap-3 px-4">
+              {[40, 70, 45, 90, 65, 85, 55, 60, 75, 50].map((h, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-3">
+                  <div className="relative w-full group">
+                    <motion.div 
+                      initial={{ height: 0 }}
+                      animate={{ height: `${h}%` }}
+                      className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg shadow-lg shadow-blue-500/20"
+                    />
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                      {h}%
+                    </div>
+                  </div>
+                  <span className="text-[9px] text-slate-400 font-black uppercase">M{i+1}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-8 border-none shadow-md bg-slate-900 text-white">
+            <h3 className="text-lg font-black uppercase tracking-tight mb-6">Próximas Cirugías</h3>
+            <div className="space-y-6">
+              {patients.slice(0, 4).map((p, i) => (
+                <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
+                  <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                    <Activity size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate">{p.nombre}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">{p.diagnostico}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Clock size={10} className="text-blue-400" />
+                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">{p.proximaCita?.split(' ')[1]}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {patients.length === 0 && (
+                <div className="text-center py-12 opacity-50">
+                  <p className="text-xs font-bold uppercase tracking-widest">Sin cirugías programadas</p>
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => setActiveTab('agenda')}
+              className="w-full mt-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+            >
+              Ver Agenda Completa
+            </button>
+          </Card>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const CalendarComponent = () => {
     const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Marzo 2026
@@ -373,6 +441,14 @@ export default function App() {
             )}
           </div>
           <div className="flex items-center gap-4">
+            {userRole === 'asistente' && (
+              <button 
+                onClick={() => setIsAddingAppointment(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-500/20"
+              >
+                <Plus size={14} /> Nueva Cita
+              </button>
+            )}
             <button 
               onClick={exportAgendaPDF}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
@@ -431,6 +507,144 @@ export default function App() {
   };
 
   const AgendaView = () => {
+    if (isAddingAppointment) {
+      return (
+        <Card className="p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Programar Nueva Cita</h3>
+            <button onClick={() => setIsAddingAppointment(false)} className="p-2 text-slate-400 hover:text-slate-600">
+              <X size={24} />
+            </button>
+          </div>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const patient: Patient = {
+              ...newAppointment as Patient,
+              id: Date.now().toString(),
+              fechaIngreso: new Date().toISOString().split('T')[0],
+              padecimiento: 'Cita programada por asistente',
+              exploracion: 'Pendiente de valoración',
+              consentimientoInformado: false
+            };
+            saveToLocalStorage([...patients, patient]);
+            setIsAddingAppointment(false);
+            setNewAppointment({
+              nombre: '',
+              edad: 0,
+              sexo: 'Masculino',
+              diagnostico: '',
+              prioridad: 'baja',
+              proximaCita: new Date().toISOString().split('T')[0] + ' 09:00',
+              asa: 'ASA I'
+            });
+          }} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="label-mono">Nombre del Paciente</label>
+                <input 
+                  required
+                  type="text" 
+                  value={newAppointment.nombre}
+                  onChange={(e) => setNewAppointment({...newAppointment, nombre: e.target.value})}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
+                  placeholder="Nombre completo"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="label-mono">Edad</label>
+                  <input 
+                    required
+                    type="number" 
+                    value={newAppointment.edad}
+                    onChange={(e) => setNewAppointment({...newAppointment, edad: parseInt(e.target.value)})}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="label-mono">Sexo</label>
+                  <select 
+                    value={newAppointment.sexo}
+                    onChange={(e) => setNewAppointment({...newAppointment, sexo: e.target.value})}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option>Masculino</option>
+                    <option>Femenino</option>
+                    <option>Otro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="label-mono">Diagnóstico Presuntivo</label>
+                <input 
+                  required
+                  type="text" 
+                  value={newAppointment.diagnostico}
+                  onChange={(e) => setNewAppointment({...newAppointment, diagnostico: e.target.value})}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
+                  placeholder="Ej. Colecistitis, Hernia, etc."
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="label-mono">Fecha y Hora de Cita</label>
+                <input 
+                  required
+                  type="datetime-local" 
+                  value={newAppointment.proximaCita?.replace(' ', 'T')}
+                  onChange={(e) => setNewAppointment({...newAppointment, proximaCita: e.target.value.replace('T', ' ')})}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="label-mono">Prioridad</label>
+                <select 
+                  value={newAppointment.prioridad}
+                  onChange={(e) => setNewAppointment({...newAppointment, prioridad: e.target.value as any})}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="baja">Baja</option>
+                  <option value="media">Media</option>
+                  <option value="alta">Alta</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label-mono">Riesgo ASA (Inicial)</label>
+                <select 
+                  value={newAppointment.asa}
+                  onChange={(e) => setNewAppointment({...newAppointment, asa: e.target.value})}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option>ASA I</option>
+                  <option>ASA II</option>
+                  <option>ASA III</option>
+                  <option>ASA IV</option>
+                </select>
+              </div>
+            </div>
+            <div className="pt-6 flex gap-4">
+              <button 
+                type="submit"
+                className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+              >
+                Guardar Cita
+              </button>
+              <button 
+                type="button"
+                onClick={() => setIsAddingAppointment(false)}
+                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Card>
+      );
+    }
+
     if (userRole === 'admin' || showFullCalendar) {
       return (
         <Card className="p-0">
@@ -444,6 +658,12 @@ export default function App() {
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800">Agenda de Consultas</h3>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsAddingAppointment(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-500/20"
+            >
+              <Plus size={16} /> Nueva Cita
+            </button>
             <button 
               onClick={exportAgendaPDF}
               className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
@@ -485,141 +705,155 @@ export default function App() {
     );
   };
 
-  const PatientsView = () => (
-    <Card className="p-0">
-      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Buscar paciente por nombre o diagnóstico..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => exportToPDF('Listado de Pacientes')}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all active:scale-95"
-          >
-            <Download size={18} /> Exportar PDF
-          </button>
-          {userRole === 'admin' && (
+  const PatientsView = () => {
+    const filteredPatients = patients.filter(p => 
+      p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      p.diagnostico.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <Card className="p-0">
+        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Buscar paciente por nombre o diagnóstico..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-2">
             <button 
-              onClick={() => {
-                setEditingPatient({ 
-                  id: '', 
-                  nombre: '', 
-                  edad: 0, 
-                  sexo: 'Masculino', 
-                  diagnostico: '', 
-                  fechaIngreso: new Date().toISOString().split('T')[0], 
-                  prioridad: 'baja', 
-                  padecimiento: '', 
-                  exploracion: '', 
-                  asa: 'ASA I',
-                  ocupacion: '',
-                  contactoEmergencia: '',
-                  antecedentesQuirurgicos: '',
-                  alergias: '',
-                  comorbilidades: '',
-                  semiologiaDolor: '',
-                  sintomasAsociados: '',
-                  ultimaIngesta: '',
-                  signosVitales: { ta: '', fc: '', fr: '', temp: '', satO2: '' },
-                  habitusExterior: '',
-                  abdomen: '',
-                  viaAerea: '',
-                  laboratorio: '',
-                  gabinete: '',
-                  goldman: '',
-                  consentimientoInformado: false
-                });
-                setActiveTab('historial');
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+              onClick={() => exportToPDF('Listado de Pacientes')}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all active:scale-95"
             >
-              <Plus size={18} /> Nuevo Paciente
+              <Download size={18} /> Exportar PDF
             </button>
-          )}
+            {userRole === 'admin' && (
+              <button 
+                onClick={() => {
+                  setEditingPatient({ 
+                    id: '', 
+                    nombre: '', 
+                    edad: 0, 
+                    sexo: 'Masculino', 
+                    diagnostico: '', 
+                    fechaIngreso: new Date().toISOString().split('T')[0], 
+                    prioridad: 'baja', 
+                    padecimiento: '', 
+                    exploracion: '', 
+                    asa: 'ASA I',
+                    ocupacion: '',
+                    contactoEmergencia: '',
+                    antecedentesQuirurgicos: '',
+                    alergias: '',
+                    comorbilidades: '',
+                    semiologiaDolor: '',
+                    sintomasAsociados: '',
+                    ultimaIngesta: '',
+                    signosVitales: { ta: '', fc: '', fr: '', temp: '', satO2: '' },
+                    habitusExterior: '',
+                    abdomen: '',
+                    viaAerea: '',
+                    laboratorio: '',
+                    gabinete: '',
+                    goldman: '',
+                    consentimientoInformado: false
+                  });
+                  setActiveTab('historial');
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+              >
+                <Plus size={18} /> Nuevo Paciente
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-bold border-b border-slate-100">
-              <th className="px-6 py-4">Paciente</th>
-              <th className="px-6 py-4">Diagnóstico</th>
-              <th className="px-6 py-4">Prioridad</th>
-              <th className="px-6 py-4">Riesgo</th>
-              <th className="px-6 py-4 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {patients.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                <td className="px-6 py-4">
-                  <p className="font-bold text-slate-800 text-sm">{p.nombre}</p>
-                  <p className="text-xs text-slate-500">{p.edad} años • {p.sexo}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-sm text-slate-600">{p.diagnostico}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant={p.prioridad}>{p.prioridad}</Badge>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant="asa">{p.asa}</Badge>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {userRole === 'admin' ? (
-                      <>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-bold border-b border-slate-100">
+                <th className="px-6 py-4">Paciente</th>
+                <th className="px-6 py-4">Diagnóstico</th>
+                <th className="px-6 py-4">Prioridad</th>
+                <th className="px-6 py-4">Riesgo</th>
+                <th className="px-6 py-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredPatients.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-slate-800 text-sm">{p.nombre}</p>
+                    <p className="text-xs text-slate-500">{p.edad} años • {p.sexo}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm text-slate-600">{p.diagnostico}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant={p.prioridad}>{p.prioridad}</Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="asa">{p.asa}</Badge>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {userRole === 'admin' ? (
+                        <>
+                          <button 
+                            onClick={() => handleEdit(p)}
+                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
+                            title="Ver Historial"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleEdit(p)}
+                            className="p-2 text-slate-400 hover:text-amber-600 transition-colors" 
+                            title="Editar"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(p.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 transition-colors" 
+                            title="Eliminar"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </>
+                      ) : (
                         <button 
-                          onClick={() => handleEdit(p)}
+                          onClick={() => {
+                            setEditingPatient(p);
+                            setActiveTab('historial');
+                            setFormTab(0);
+                          }}
                           className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
-                          title="Ver Historial"
+                          title="Ver Datos Generales"
                         >
                           <Eye size={18} />
                         </button>
-                        <button 
-                          onClick={() => handleEdit(p)}
-                          className="p-2 text-slate-400 hover:text-amber-600 transition-colors" 
-                          title="Editar"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(p.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 transition-colors" 
-                          title="Eliminar"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          setEditingPatient(p);
-                          // Solo permitimos ver datos generales, no el historial completo
-                          // Podríamos crear una vista simplificada o simplemente abrir el primer tab del historial (Identificación)
-                          setActiveTab('historial');
-                          setFormTab(0);
-                        }}
-                        className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
-                        title="Ver Datos Generales"
-                      >
-                        <Eye size={18} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredPatients.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
+                    No se encontraron pacientes
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    );
+  };
 
   const ClinicalHistoryView = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -1080,49 +1314,88 @@ export default function App() {
   };
 
   const ProfileView = () => (
-    <div className="max-w-2xl space-y-6">
-      <Card className="p-8">
-        <div className="flex items-center gap-6 mb-8">
-          <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-3xl font-black">
-            DR
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Dr. Alejandro Martínez</h3>
-            <p className="text-sm text-slate-500">Cirujano General • Especialista en Laparoscopia</p>
-          </div>
-        </div>
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="label-mono">Cédula Profesional</label>
-              <input type="text" defaultValue="12345678" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" />
+    <div className="max-w-4xl space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="p-8 border-none shadow-md">
+          <div className="flex items-center gap-6 mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-blue-500/20">
+              {userRole === 'admin' ? 'DRA' : 'AS'}
             </div>
-            <div className="space-y-2">
-              <label className="label-mono">Especialidad</label>
-              <input type="text" defaultValue="Cirugía General" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" />
+            <div>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                {userRole === 'admin' ? 'Dra. Johana Bribiesca' : 'Sandra Santiago'}
+              </h3>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
+                {userRole === 'admin' ? 'Cirujano General • Laparoscopia' : 'Asistente Médico Quirúrgico'}
+              </p>
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="label-mono">Correo Electrónico</label>
-            <input type="email" defaultValue="dr.martinez@hospital.com" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="label-mono">Cédula Profesional</label>
+                <input type="text" defaultValue={userRole === 'admin' ? '12345678' : 'AS-987654'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div className="space-y-2">
+                <label className="label-mono">Especialidad</label>
+                <input type="text" defaultValue={userRole === 'admin' ? 'Cirugía General' : 'Administración Médica'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="label-mono">Correo Electrónico</label>
+              <input type="email" defaultValue={userRole === 'admin' ? 'dra.bribiesca@hospital.com' : 'sandra.santiago@hospital.com'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+            </div>
+            <button className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+              Actualizar Perfil
+            </button>
           </div>
-          <button className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all">
-            Actualizar Perfil
-          </button>
-        </div>
-      </Card>
+        </Card>
+
+        <Card className="p-8 border-none shadow-md">
+          <h3 className="text-lg font-black uppercase tracking-tight mb-8">Configuración del Sistema</h3>
+          <div className="space-y-6">
+            {[
+              { label: 'Notificaciones Push', desc: 'Alertas de nuevas citas y cambios', active: true },
+              { label: 'Sincronización en la Nube', desc: 'Respaldo automático de datos', active: false },
+              { label: 'Modo Oscuro', desc: 'Interfaz optimizada para baja luz', active: false },
+              { label: 'Exportación Automática', desc: 'Generar PDF al guardar historial', active: true },
+            ].map((setting, i) => (
+              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{setting.label}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{setting.desc}</p>
+                </div>
+                <div className={cn(
+                  "w-12 h-6 rounded-full p-1 transition-all cursor-pointer",
+                  setting.active ? "bg-blue-600" : "bg-slate-300"
+                )}>
+                  <div className={cn(
+                    "w-4 h-4 bg-white rounded-full transition-all",
+                    setting.active ? "translate-x-6" : "translate-x-0"
+                  )} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
       
-      <Card className="p-8 border-red-100 bg-red-50/30">
-        <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2">
-          <AlertCircle size={18} /> Zona de Peligro
-        </h4>
-        <p className="text-xs text-red-600 mb-4">Estas acciones son permanentes y afectarán a todos los datos del sistema.</p>
-        <button 
-          onClick={() => { localStorage.removeItem('cirujano_ia_data'); window.location.reload(); }}
-          className="px-4 py-2 border border-red-200 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-all"
-        >
-          Restablecer Base de Datos
-        </button>
+      <Card className="p-8 border-red-100 bg-red-50/30 border-none shadow-md">
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-xl bg-red-100 text-red-600">
+            <AlertCircle size={24} />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-black text-red-800 uppercase tracking-tight mb-1">Zona de Peligro</h4>
+            <p className="text-xs text-red-600 font-bold mb-6 uppercase tracking-widest">Estas acciones son permanentes y afectarán a todos los datos del sistema.</p>
+            <button 
+              onClick={() => { if(confirm('¿Estás seguro de restablecer todos los datos?')) { localStorage.removeItem('cirujano_ia_data'); window.location.reload(); } }}
+              className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-95"
+            >
+              Restablecer Base de Datos
+            </button>
+          </div>
+        </div>
       </Card>
     </div>
   );
