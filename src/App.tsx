@@ -136,6 +136,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('asistente');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [showNotification, setShowNotification] = useState(false);
@@ -152,6 +153,22 @@ export default function App() {
       localStorage.setItem('cirujano_ia_data', JSON.stringify(MOCK_DATA));
     }
   }, []);
+
+  // Role-based Access Control
+  useEffect(() => {
+    const sidebarItems = [
+      { id: 'dashboard', roles: ['admin', 'asistente'] },
+      { id: 'agenda', roles: ['admin', 'asistente'] },
+      { id: 'pacientes', roles: ['admin', 'asistente'] },
+      { id: 'historial', roles: ['admin'] },
+      { id: 'perfil', roles: ['admin', 'asistente'] },
+    ];
+    
+    const currentItem = sidebarItems.find(item => item.id === activeTab);
+    if (currentItem && !currentItem.roles.includes(userRole)) {
+      setActiveTab('dashboard');
+    }
+  }, [userRole, activeTab]);
 
   const handleLogin = (role: UserRole) => {
     setUserRole(role);
@@ -171,11 +188,15 @@ export default function App() {
   };
 
   // PDF Export
-  const exportToPDF = () => {
+  const exportToPDF = (title: string = 'Listado de Pacientes', data?: any[][], headers?: string[]) => {
     const doc = new jsPDF();
-    doc.text('Listado de Pacientes - Cirujano IA', 14, 15);
+    doc.setFontSize(18);
+    doc.text(title, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Fecha de generación: ${new Date().toLocaleString()}`, 14, 28);
     
-    const tableData = patients.map(p => [
+    const defaultHeaders = ['Nombre', 'Edad', 'Sexo', 'Diagnóstico', 'Prioridad', 'ASA'];
+    const defaultData = patients.map(p => [
       p.nombre,
       p.edad,
       p.sexo,
@@ -185,12 +206,26 @@ export default function App() {
     ]);
 
     (doc as any).autoTable({
-      head: [['Nombre', 'Edad', 'Sexo', 'Diagnóstico', 'Prioridad', 'ASA']],
-      body: tableData,
-      startY: 25,
+      head: [headers || defaultHeaders],
+      body: data || defaultData,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillStyle: '#2563eb', textColor: '#ffffff' },
+      alternateRowStyles: { fillStyle: '#f8fafc' }
     });
 
-    doc.save('pacientes_cirujano_ia.pdf');
+    doc.save(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
+  };
+
+  const exportAgendaPDF = () => {
+    const headers = ['Hora', 'Paciente', 'Diagnóstico', 'Prioridad'];
+    const data = patients.map(p => [
+      p.proximaCita?.split(' ')[1] || 'N/A',
+      p.nombre,
+      p.diagnostico,
+      p.prioridad.toUpperCase()
+    ]);
+    exportToPDF('Agenda de Consultas', data, headers);
   };
 
   // Actions
@@ -299,37 +334,156 @@ export default function App() {
     </div>
   );
 
-  const AgendaView = () => (
-    <Card className="p-0">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="font-bold text-slate-800">Agenda de Consultas</h3>
-        <button className="text-xs font-bold text-blue-600 hover:underline">Ver Calendario Completo</button>
-      </div>
-      <div className="divide-y divide-slate-50">
-        {patients.map((p, i) => (
-          <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-            <div className="flex items-center gap-6">
-              <div className="text-center min-w-[60px]">
-                <p className="text-xl font-black text-slate-900">{p.proximaCita?.split(' ')[1].split(':')[0]}</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AM</p>
-              </div>
-              <div className="h-10 w-[1px] bg-slate-200" />
-              <div>
-                <p className="font-bold text-slate-800">{p.nombre}</p>
-                <p className="text-xs text-slate-500">{p.diagnostico}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Badge variant={p.prioridad}>{p.prioridad}</Badge>
-              <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                <MoreVertical size={18} />
+  const CalendarComponent = () => {
+    const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Marzo 2026
+    
+    const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+    
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const totalDays = daysInMonth(year, month);
+    const startDay = firstDayOfMonth(year, month);
+    
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    
+    const days = [];
+    for (let i = 0; i < startDay; i++) days.push(null);
+    for (let i = 1; i <= totalDays; i++) days.push(i);
+    
+    const getAppointmentsForDay = (day: number) => {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return patients.filter(p => p.proximaCita?.startsWith(dateStr));
+    };
+
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
+              {monthNames[month]} <span className="text-blue-600">{year}</span>
+            </h3>
+            {userRole === 'asistente' && (
+              <button 
+                onClick={() => setShowFullCalendar(false)}
+                className="text-[10px] font-bold text-blue-600 uppercase tracking-widest hover:underline"
+              >
+                Volver a Lista
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={exportAgendaPDF}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+            >
+              <Download size={14} /> PDF
+            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <ChevronRight size={20} className="rotate-180" />
+              </button>
+              <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <ChevronRight size={20} />
               </button>
             </div>
           </div>
-        ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map(d => (
+            <div key={d} className="bg-slate-50 p-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
+              {d}
+            </div>
+          ))}
+          {days.map((day, i) => {
+            const appointments = day ? getAppointmentsForDay(day) : [];
+            return (
+              <div key={i} className={cn(
+                "bg-white min-h-[100px] md:min-h-[120px] p-2 transition-colors hover:bg-slate-50/50",
+                !day && "bg-slate-50/30"
+              )}>
+                {day && (
+                  <>
+                    <p className={cn(
+                      "text-xs font-bold mb-2 w-6 h-6 flex items-center justify-center rounded-full",
+                      day === 26 && month === 2 && year === 2026 ? "bg-blue-600 text-white" : "text-slate-400"
+                    )}>{day}</p>
+                    <div className="space-y-1">
+                      {appointments.map((app, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => handleEdit(app)}
+                          className="p-1.5 bg-blue-50 border-l-2 border-blue-500 rounded text-[9px] font-bold text-blue-700 truncate cursor-pointer hover:bg-blue-100 transition-colors"
+                        >
+                          {app.proximaCita?.split(' ')[1]} {app.nombre}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </Card>
-  );
+    );
+  };
+
+  const AgendaView = () => {
+    if (userRole === 'admin' || showFullCalendar) {
+      return (
+        <Card className="p-0">
+          <CalendarComponent />
+        </Card>
+      );
+    }
+
+    return (
+      <Card className="p-0">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">Agenda de Consultas</h3>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={exportAgendaPDF}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+            >
+              <Download size={14} /> PDF
+            </button>
+            <button 
+              onClick={() => setShowFullCalendar(true)}
+              className="text-xs font-bold text-blue-600 hover:underline"
+            >
+              Ver Calendario Completo
+            </button>
+          </div>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {patients.map((p, i) => (
+            <div key={i} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <div className="flex items-center gap-6">
+                <div className="text-center min-w-[60px]">
+                  <p className="text-xl font-black text-slate-900">{p.proximaCita?.split(' ')[1].split(':')[0]}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AM</p>
+                </div>
+                <div className="h-10 w-[1px] bg-slate-200" />
+                <div>
+                  <p className="font-bold text-slate-800">{p.nombre}</p>
+                  <p className="text-xs text-slate-500">{p.diagnostico}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <Badge variant={p.prioridad}>{p.prioridad}</Badge>
+                <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                  <MoreVertical size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  };
 
   const PatientsView = () => (
     <Card className="p-0">
@@ -344,47 +498,49 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           <button 
-            onClick={exportToPDF}
+            onClick={() => exportToPDF('Listado de Pacientes')}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all active:scale-95"
           >
             <Download size={18} /> Exportar PDF
           </button>
-          <button 
-            onClick={() => {
-              setEditingPatient({ 
-                id: '', 
-                nombre: '', 
-                edad: 0, 
-                sexo: 'Masculino', 
-                diagnostico: '', 
-                fechaIngreso: new Date().toISOString().split('T')[0], 
-                prioridad: 'baja', 
-                padecimiento: '', 
-                exploracion: '', 
-                asa: 'ASA I',
-                ocupacion: '',
-                contactoEmergencia: '',
-                antecedentesQuirurgicos: '',
-                alergias: '',
-                comorbilidades: '',
-                semiologiaDolor: '',
-                sintomasAsociados: '',
-                ultimaIngesta: '',
-                signosVitales: { ta: '', fc: '', fr: '', temp: '', satO2: '' },
-                habitusExterior: '',
-                abdomen: '',
-                viaAerea: '',
-                laboratorio: '',
-                gabinete: '',
-                goldman: '',
-                consentimientoInformado: false
-              });
-              setActiveTab('historial');
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
-          >
-            <Plus size={18} /> Nuevo Paciente
-          </button>
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => {
+                setEditingPatient({ 
+                  id: '', 
+                  nombre: '', 
+                  edad: 0, 
+                  sexo: 'Masculino', 
+                  diagnostico: '', 
+                  fechaIngreso: new Date().toISOString().split('T')[0], 
+                  prioridad: 'baja', 
+                  padecimiento: '', 
+                  exploracion: '', 
+                  asa: 'ASA I',
+                  ocupacion: '',
+                  contactoEmergencia: '',
+                  antecedentesQuirurgicos: '',
+                  alergias: '',
+                  comorbilidades: '',
+                  semiologiaDolor: '',
+                  sintomasAsociados: '',
+                  ultimaIngesta: '',
+                  signosVitales: { ta: '', fc: '', fr: '', temp: '', satO2: '' },
+                  habitusExterior: '',
+                  abdomen: '',
+                  viaAerea: '',
+                  laboratorio: '',
+                  gabinete: '',
+                  goldman: '',
+                  consentimientoInformado: false
+                });
+                setActiveTab('historial');
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+            >
+              <Plus size={18} /> Nuevo Paciente
+            </button>
+          )}
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -416,23 +572,45 @@ export default function App() {
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Ver Detalles">
-                      <Eye size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleEdit(p)}
-                      className="p-2 text-slate-400 hover:text-amber-600 transition-colors" 
-                      title="Editar"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(p.id)}
-                      className="p-2 text-slate-400 hover:text-red-600 transition-colors" 
-                      title="Eliminar"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {userRole === 'admin' ? (
+                      <>
+                        <button 
+                          onClick={() => handleEdit(p)}
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
+                          title="Ver Historial"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleEdit(p)}
+                          className="p-2 text-slate-400 hover:text-amber-600 transition-colors" 
+                          title="Editar"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(p.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 transition-colors" 
+                          title="Eliminar"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          setEditingPatient(p);
+                          // Solo permitimos ver datos generales, no el historial completo
+                          // Podríamos crear una vista simplificada o simplemente abrir el primer tab del historial (Identificación)
+                          setActiveTab('historial');
+                          setFormTab(0);
+                        }}
+                        className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
+                        title="Ver Datos Generales"
+                      >
+                        <Eye size={18} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1028,7 +1206,7 @@ export default function App() {
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'asistente'] },
             { id: 'agenda', label: 'Agenda', icon: Calendar, roles: ['admin', 'asistente'] },
             { id: 'pacientes', label: 'Pacientes', icon: Users, roles: ['admin', 'asistente'] },
-            { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin', 'asistente'] },
+            { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin'] },
             { id: 'perfil', label: 'Perfil y Config', icon: Settings, roles: ['admin', 'asistente'] },
           ].filter(item => item.roles.includes(userRole)).map((item) => (
             <button
