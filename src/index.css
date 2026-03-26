@@ -26,7 +26,19 @@
 }
 
 .label-mono {
-  @apply font-mono text-[10px] uppercase tracking-wider text-slate-400 mb-1;
+  @apply font-mono text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block;
+}
+
+.modern-input {
+  @apply w-full p-4 bg-slate-50/50 border border-slate-100 rounded-2xl text-sm font-medium outline-none transition-all focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 placeholder:text-slate-300;
+}
+
+.modern-select {
+  @apply w-full p-4 bg-slate-50/50 border border-slate-100 rounded-2xl text-sm font-medium outline-none transition-all focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 appearance-none cursor-pointer;
+}
+
+.modern-textarea {
+  @apply w-full p-4 bg-slate-50/50 border border-slate-100 rounded-2xl text-sm font-medium outline-none transition-all focus:bg-white focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/5 placeholder:text-slate-300 resize-none;
 }
 
 .nav-item-active {

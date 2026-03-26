@@ -1,0 +1,21 @@
+{
+  "name": "Medico Cirujano",
+  "short_name": "Medico Cirujano",
+  "description": "Asistente Médico Quirúrgico de Inteligencia Artificial",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F9FC",
+  "theme_color": "#FF6B81",
+  "icons": [
+    {
+      "src": "https://w7.pngwing.com/pngs/590/717/png-transparent-medicine-medical-purple-violet-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://w7.pngwing.com/pngs/590/717/png-transparent-medicine-medical-purple-violet-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

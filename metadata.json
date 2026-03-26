@@ -1,5 +1,5 @@
 {
-  "name": "Médico Cirujano Gral.",
+  "name": "Medico Cirujano",
   "description": "Asistente médico inteligente para estructuración de notas quirúrgicas, cálculo de riesgos y gestión de pacientes.",
   "requestFramePermissions": [
     "microphone"

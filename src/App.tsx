@@ -25,7 +25,10 @@ import {
   Menu,
   X,
   Stethoscope,
-  Download
+  Download,
+  ChevronDown,
+  Briefcase,
+  Phone
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -139,7 +142,7 @@ const Badge = ({ variant, children }: { variant: 'alta' | 'media' | 'baja' | 'as
     alta: 'bg-red-50 text-red-700 border-red-100',
     media: 'bg-amber-50 text-amber-700 border-amber-100',
     baja: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    asa: 'bg-blue-50 text-blue-700 border-blue-100'
+    asa: 'bg-brand-primary/10 text-brand-primary border-brand-primary/20'
   };
   return (
     <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border", styles[variant as keyof typeof styles])}>
@@ -161,6 +164,42 @@ export default function App() {
   const [showNotification, setShowNotification] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [formTab, setFormTab] = useState(0);
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallPopup, setShowInstallPopup] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallPopup(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    setDeferredPrompt(null);
+    setShowInstallPopup(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const [isAddingAppointment, setIsAddingAppointment] = useState(false);
   const [newAppointment, setNewAppointment] = useState<Partial<Patient>>({
@@ -217,6 +256,50 @@ export default function App() {
     setTimeout(() => setShowNotification(false), 3000);
   };
 
+  const ActionMenu = ({ patient, module }: { patient: Patient, module: string }) => (
+    <div className="relative">
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveMenu(activeMenu === `${module}-${patient.id}` ? null : `${module}-${patient.id}`);
+        }}
+        className="p-2 text-slate-400 hover:text-brand-primary transition-colors rounded-full hover:bg-slate-100"
+      >
+        <MoreVertical size={18} />
+      </button>
+      {activeMenu === `${module}-${patient.id}` && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden animate-in fade-in zoom-in duration-200">
+          <button 
+            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Eye size={16} className="text-brand-primary" /> Ver Detalle
+          </button>
+          <button 
+            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Edit2 size={16} className="text-amber-500" /> Editar Registro
+          </button>
+          <button 
+            onClick={() => { exportToPDF(`Registro_${patient.nombre}`); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Download size={16} className="text-emerald-500" /> Guardar (PDF)
+          </button>
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => { handleDelete(patient.id); setActiveMenu(null); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} /> Borrar Registro
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   // PDF Export
   const exportToPDF = (title: string = 'Listado de Pacientes', data?: any[][], headers?: string[]) => {
     try {
@@ -241,7 +324,7 @@ export default function App() {
         body: data || defaultData,
         startY: 35,
         theme: 'grid',
-        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
+        headStyles: { fillColor: [255, 107, 129], textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: [248, 250, 252] }
       });
 
@@ -306,8 +389,8 @@ export default function App() {
     return (
       <div className="space-y-10">
         {/* Top Stats Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {stats.map((stat, i) => (
               <Card key={i} className="flex flex-col justify-between h-48 p-8 hover:scale-105 transition-transform cursor-default">
                 <div className="flex items-center justify-between">
@@ -316,7 +399,7 @@ export default function App() {
                     <stat.icon size={20} />
                   </div>
                 </div>
-                <h3 className="text-5xl font-black text-brand-secondary tracking-tighter">{stat.value}</h3>
+                <h3 className="text-4xl sm:text-5xl font-black text-brand-secondary tracking-tighter">{stat.value}</h3>
               </Card>
             ))}
           </div>
@@ -343,7 +426,7 @@ export default function App() {
               </div>
             </Card>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-6">
               {[
                 { label: 'Agenda', icon: Calendar, color: 'bg-brand-primary', id: 'agenda' },
                 { label: 'Pacientes', icon: Users, color: 'bg-brand-secondary', id: 'pacientes' },
@@ -396,12 +479,12 @@ export default function App() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">
-              {monthNames[month]} <span className="text-blue-600">{year}</span>
+              {monthNames[month]} <span className="text-brand-primary">{year}</span>
             </h3>
             {userRole === 'asistente' && (
               <button 
                 onClick={() => setShowFullCalendar(false)}
-                className="text-[10px] font-bold text-blue-600 uppercase tracking-widest hover:underline"
+                className="text-[10px] font-bold text-brand-primary uppercase tracking-widest hover:underline"
               >
                 Volver a Lista
               </button>
@@ -411,7 +494,7 @@ export default function App() {
             {userRole === 'asistente' && (
               <button 
                 onClick={() => setIsAddingAppointment(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-500/20"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-primary/90 transition-all active:scale-95 shadow-md shadow-brand-primary/20"
               >
                 <Plus size={14} /> Nueva Cita
               </button>
@@ -450,14 +533,14 @@ export default function App() {
                   <>
                     <p className={cn(
                       "text-xs font-bold mb-2 w-6 h-6 flex items-center justify-center rounded-full",
-                      day === 26 && month === 2 && year === 2026 ? "bg-blue-600 text-white" : "text-slate-400"
+                      day === 26 && month === 2 && year === 2026 ? "bg-brand-primary text-white" : "text-slate-400"
                     )}>{day}</p>
                     <div className="space-y-1">
                       {appointments.map((app, idx) => (
                         <div 
                           key={idx} 
                           onClick={() => handleEdit(app)}
-                          className="p-1.5 bg-blue-50 border-l-2 border-blue-500 rounded text-[9px] font-bold text-blue-700 truncate cursor-pointer hover:bg-blue-100 transition-colors"
+                          className="p-1.5 bg-brand-primary/10 border-l-2 border-brand-primary rounded text-[9px] font-bold text-brand-primary truncate cursor-pointer hover:bg-brand-primary/20 transition-colors"
                         >
                           {app.proximaCita?.split(' ')[1]} {app.nombre}
                         </div>
@@ -504,20 +587,23 @@ export default function App() {
               proximaCita: new Date().toISOString().split('T')[0] + ' 09:00',
               asa: 'ASA I'
             });
-          }} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          }} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
                 <label className="label-mono">Nombre del Paciente</label>
-                <input 
-                  required
-                  type="text" 
-                  value={newAppointment.nombre}
-                  onChange={(e) => setNewAppointment({...newAppointment, nombre: e.target.value})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
-                  placeholder="Nombre completo"
-                />
+                <div className="relative">
+                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                  <input 
+                    required
+                    type="text" 
+                    value={newAppointment.nombre}
+                    onChange={(e) => setNewAppointment({...newAppointment, nombre: e.target.value})}
+                    className="modern-input pl-12" 
+                    placeholder="Nombre completo"
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="label-mono">Edad</label>
                   <input 
@@ -525,77 +611,92 @@ export default function App() {
                     type="number" 
                     value={newAppointment.edad}
                     onChange={(e) => setNewAppointment({...newAppointment, edad: parseInt(e.target.value)})}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
+                    className="modern-input" 
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="label-mono">Sexo</label>
-                  <select 
-                    value={newAppointment.sexo}
-                    onChange={(e) => setNewAppointment({...newAppointment, sexo: e.target.value})}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option>Masculino</option>
-                    <option>Femenino</option>
-                    <option>Otro</option>
-                  </select>
+                  <div className="relative">
+                    <select 
+                      value={newAppointment.sexo}
+                      onChange={(e) => setNewAppointment({...newAppointment, sexo: e.target.value})}
+                      className="modern-select"
+                    >
+                      <option>Masculino</option>
+                      <option>Femenino</option>
+                      <option>Otro</option>
+                    </select>
+                    <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
                 <label className="label-mono">Diagnóstico Presuntivo</label>
-                <input 
-                  required
-                  type="text" 
-                  value={newAppointment.diagnostico}
-                  onChange={(e) => setNewAppointment({...newAppointment, diagnostico: e.target.value})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
-                  placeholder="Ej. Colecistitis, Hernia, etc."
-                />
+                <div className="relative">
+                  <Activity size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                  <input 
+                    required
+                    type="text" 
+                    value={newAppointment.diagnostico}
+                    onChange={(e) => setNewAppointment({...newAppointment, diagnostico: e.target.value})}
+                    className="modern-input pl-12" 
+                    placeholder="Ej. Colecistitis, Hernia, etc."
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="label-mono">Fecha y Hora de Cita</label>
-                <input 
-                  required
-                  type="datetime-local" 
-                  value={newAppointment.proximaCita?.replace(' ', 'T')}
-                  onChange={(e) => setNewAppointment({...newAppointment, proximaCita: e.target.value.replace('T', ' ')})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" 
-                />
+                <div className="relative">
+                  <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                  <input 
+                    required
+                    type="datetime-local" 
+                    value={newAppointment.proximaCita?.replace(' ', 'T')}
+                    onChange={(e) => setNewAppointment({...newAppointment, proximaCita: e.target.value.replace('T', ' ')})}
+                    className="modern-input pl-12" 
+                  />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-8">
               <div className="space-y-2">
                 <label className="label-mono">Prioridad</label>
-                <select 
-                  value={newAppointment.prioridad}
-                  onChange={(e) => setNewAppointment({...newAppointment, prioridad: e.target.value as any})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="baja">Baja</option>
-                  <option value="media">Media</option>
-                  <option value="alta">Alta</option>
-                </select>
+                <div className="relative">
+                  <select 
+                    value={newAppointment.prioridad}
+                    onChange={(e) => setNewAppointment({...newAppointment, prioridad: e.target.value as any})}
+                    className="modern-select"
+                  >
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                  <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="label-mono">Riesgo ASA (Inicial)</label>
-                <select 
-                  value={newAppointment.asa}
-                  onChange={(e) => setNewAppointment({...newAppointment, asa: e.target.value})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option>ASA I</option>
-                  <option>ASA II</option>
-                  <option>ASA III</option>
-                  <option>ASA IV</option>
-                </select>
+                <div className="relative">
+                  <select 
+                    value={newAppointment.asa}
+                    onChange={(e) => setNewAppointment({...newAppointment, asa: e.target.value})}
+                    className="modern-select"
+                  >
+                    <option>ASA I</option>
+                    <option>ASA II</option>
+                    <option>ASA III</option>
+                    <option>ASA IV</option>
+                  </select>
+                  <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                </div>
               </div>
             </div>
             <div className="pt-6 flex gap-4">
               <button 
                 type="submit"
-                className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                className="flex-1 py-4 bg-brand-primary text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-brand-primary/90 transition-all shadow-lg shadow-brand-primary/20 active:scale-95"
               >
                 Guardar Cita
               </button>
@@ -627,7 +728,7 @@ export default function App() {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsAddingAppointment(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-500/20"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-brand-primary/90 transition-all active:scale-95 shadow-md shadow-brand-primary/20"
             >
               <Plus size={16} /> Nueva Cita
             </button>
@@ -639,7 +740,7 @@ export default function App() {
             </button>
             <button 
               onClick={() => setShowFullCalendar(true)}
-              className="text-xs font-bold text-blue-600 hover:underline"
+              className="text-xs font-bold text-brand-primary hover:underline"
             >
               Ver Calendario Completo
             </button>
@@ -661,9 +762,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-4">
                 <Badge variant={p.prioridad}>{p.prioridad}</Badge>
-                <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                  <MoreVertical size={18} />
-                </button>
+                {ActionMenu({ patient: p, module: 'agenda' })}
               </div>
             </div>
           ))}
@@ -688,7 +787,7 @@ export default function App() {
               placeholder="Buscar paciente por nombre o diagnóstico..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -731,33 +830,33 @@ export default function App() {
                   });
                   setActiveTab('historial');
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg text-sm font-bold hover:bg-brand-primary/90 shadow-md shadow-brand-primary/20 transition-all active:scale-95"
               >
                 <Plus size={18} /> Nuevo Paciente
               </button>
             )}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
+        <div className="overflow-x-auto custom-scrollbar -mx-6 px-6">
+          <table className="w-full text-left min-w-[800px]">
             <thead>
               <tr className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 font-bold border-b border-slate-100">
-                <th className="px-6 py-4">Paciente</th>
-                <th className="px-6 py-4">Diagnóstico</th>
-                <th className="px-6 py-4">Prioridad</th>
-                <th className="px-6 py-4">Riesgo</th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-6 py-6">Paciente</th>
+                <th className="px-6 py-6">Diagnóstico</th>
+                <th className="px-6 py-6">Prioridad</th>
+                <th className="px-6 py-6">Riesgo</th>
+                <th className="px-6 py-6 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredPatients.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <p className="font-bold text-slate-800 text-sm">{p.nombre}</p>
-                    <p className="text-xs text-slate-500">{p.edad} años • {p.sexo}</p>
+                    <p className="font-bold text-slate-800 text-sm whitespace-nowrap">{p.nombre}</p>
+                    <p className="text-xs text-slate-500 whitespace-nowrap">{p.edad} años • {p.sexo}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-sm text-slate-600">{p.diagnostico}</p>
+                    <p className="text-sm text-slate-600 line-clamp-1 max-w-[200px]">{p.diagnostico}</p>
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant={p.prioridad}>{p.prioridad}</Badge>
@@ -766,44 +865,8 @@ export default function App() {
                     <Badge variant="asa">{p.asa}</Badge>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {userRole === 'admin' ? (
-                        <>
-                          <button 
-                            onClick={() => handleEdit(p)}
-                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
-                            title="Ver Historial"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleEdit(p)}
-                            className="p-2 text-slate-400 hover:text-amber-600 transition-colors" 
-                            title="Editar"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(p.id)}
-                            className="p-2 text-slate-400 hover:text-red-600 transition-colors" 
-                            title="Eliminar"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </>
-                      ) : (
-                        <button 
-                          onClick={() => {
-                            setEditingPatient(p);
-                            setActiveTab('historial');
-                            setFormTab(0);
-                          }}
-                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors" 
-                          title="Ver Datos Generales"
-                        >
-                          <Eye size={18} />
-                        </button>
-                      )}
+                    <div className="flex items-center justify-end gap-2">
+                      {ActionMenu({ patient: p, module: 'pacientes' })}
                     </div>
                   </td>
                 </tr>
@@ -869,7 +932,7 @@ export default function App() {
               });
               setFormTab(0);
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+            className="flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-xl font-bold hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
           >
             <Plus size={18} /> Nuevo Registro
           </button>
@@ -884,7 +947,7 @@ export default function App() {
                 placeholder="Buscar por nombre o diagnóstico..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-primary/20"
               />
             </div>
           </div>
@@ -897,7 +960,7 @@ export default function App() {
                   className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-lg group-hover:bg-blue-600 group-hover:text-white transition-all">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center font-black text-lg group-hover:bg-brand-primary group-hover:text-white transition-all">
                       {p.nombre.charAt(0)}
                     </div>
                     <div>
@@ -910,7 +973,7 @@ export default function App() {
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última Actualización</p>
                       <p className="text-xs font-bold text-slate-700">{p.fechaIngreso}</p>
                     </div>
-                    <div className="p-2 rounded-lg bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-600 transition-all">
+                    <div className="p-2 rounded-lg bg-slate-100 text-slate-400 group-hover:bg-brand-primary/10 group-hover:text-brand-primary transition-all">
                       <ChevronRight size={20} />
                     </div>
                   </div>
@@ -941,7 +1004,7 @@ export default function App() {
                 onClick={() => setFormTab(i)}
                 className={cn(
                   "px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
-                  formTab === i ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-400 hover:text-slate-600"
+                  formTab === i ? "border-brand-primary text-brand-primary bg-white" : "border-transparent text-slate-400 hover:text-slate-600"
                 )}
               >
                 {t}
@@ -966,56 +1029,68 @@ export default function App() {
             >
               {formTab === 0 && (
                 <div className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <label className="label-mono">Nombre Completo</label>
-                      <input 
-                        type="text" 
-                        value={editingPatient.nombre}
-                        onChange={e => setEditingPatient({...editingPatient, nombre: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
+                      <div className="relative">
+                        <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                        <input 
+                          type="text" 
+                          value={editingPatient.nombre}
+                          onChange={e => setEditingPatient({...editingPatient, nombre: e.target.value})}
+                          className="modern-input pl-12"
+                        />
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="label-mono">Edad</label>
                         <input 
                           type="number" 
                           value={editingPatient.edad}
                           onChange={e => setEditingPatient({...editingPatient, edad: parseInt(e.target.value)})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+                          className="modern-input"
                         />
                       </div>
                       <div className="space-y-2">
                         <label className="label-mono">Sexo</label>
-                        <select 
-                          value={editingPatient.sexo}
-                          onChange={e => setEditingPatient({...editingPatient, sexo: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                        >
-                          <option>Masculino</option>
-                          <option>Femenino</option>
-                          <option>Otro</option>
-                        </select>
+                        <div className="relative">
+                          <select 
+                            value={editingPatient.sexo}
+                            onChange={e => setEditingPatient({...editingPatient, sexo: e.target.value})}
+                            className="modern-select"
+                          >
+                            <option>Masculino</option>
+                            <option>Femenino</option>
+                            <option>Otro</option>
+                          </select>
+                          <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                        </div>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <label className="label-mono">Ocupación</label>
-                      <input 
-                        type="text" 
-                        value={editingPatient.ocupacion || ''}
-                        onChange={e => setEditingPatient({...editingPatient, ocupacion: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
+                      <div className="relative">
+                        <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                        <input 
+                          type="text" 
+                          value={editingPatient.ocupacion || ''}
+                          onChange={e => setEditingPatient({...editingPatient, ocupacion: e.target.value})}
+                          className="modern-input pl-12"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="label-mono">Contacto de Emergencia</label>
-                      <input 
-                        type="text" 
-                        value={editingPatient.contactoEmergencia || ''}
-                        onChange={e => setEditingPatient({...editingPatient, contactoEmergencia: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
+                      <div className="relative">
+                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                        <input 
+                          type="text" 
+                          value={editingPatient.contactoEmergencia || ''}
+                          onChange={e => setEditingPatient({...editingPatient, contactoEmergencia: e.target.value})}
+                          className="modern-input pl-12"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1028,7 +1103,7 @@ export default function App() {
                           rows={2}
                           value={editingPatient.antecedentesQuirurgicos || ''}
                           onChange={e => setEditingPatient({...editingPatient, antecedentesQuirurgicos: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                          className="modern-textarea"
                           placeholder="Tipo de cirugía, fecha y complicaciones anestésicas..."
                         />
                       </div>
@@ -1038,7 +1113,7 @@ export default function App() {
                           rows={2}
                           value={editingPatient.alergias || ''}
                           onChange={e => setEditingPatient({...editingPatient, alergias: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                          className="modern-textarea"
                           placeholder="Medicamentos, látex, cintas adhesivas..."
                         />
                       </div>
@@ -1048,7 +1123,7 @@ export default function App() {
                           rows={2}
                           value={editingPatient.comorbilidades || ''}
                           onChange={e => setEditingPatient({...editingPatient, comorbilidades: e.target.value})}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                          className="modern-textarea"
                           placeholder="HTA, Diabetes, enfermedades cardiovasculares o pulmonares..."
                         />
                       </div>
@@ -1065,7 +1140,7 @@ export default function App() {
                       rows={4}
                       value={editingPatient.semiologiaDolor || ''}
                       onChange={e => setEditingPatient({...editingPatient, semiologiaDolor: e.target.value})}
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                      className="modern-textarea"
                       placeholder="Antigüedad, Localización, Irradiación, Carácter, Intensidad, Atenuación/Agravamiento..."
                     />
                   </div>
@@ -1075,19 +1150,22 @@ export default function App() {
                       rows={3}
                       value={editingPatient.sintomasAsociados || ''}
                       onChange={e => setEditingPatient({...editingPatient, sintomasAsociados: e.target.value})}
-                      className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                      className="modern-textarea"
                       placeholder="Náuseas, vómito, fiebre, cambios en el hábito intestinal o urinario..."
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="label-mono">Última ingesta (Ayuno)</label>
-                    <input 
-                      type="text" 
-                      value={editingPatient.ultimaIngesta || ''}
-                      onChange={e => setEditingPatient({...editingPatient, ultimaIngesta: e.target.value})}
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                      placeholder="Hora y tipo de alimento..."
-                    />
+                    <div className="relative">
+                      <Clock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                      <input 
+                        type="text" 
+                        value={editingPatient.ultimaIngesta || ''}
+                        onChange={e => setEditingPatient({...editingPatient, ultimaIngesta: e.target.value})}
+                        className="modern-input pl-12"
+                        placeholder="Hora y tipo de alimento..."
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -1096,54 +1174,54 @@ export default function App() {
                 <div className="space-y-8">
                   <div className="space-y-4">
                     <h4 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">Signos Vitales</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TA</label>
+                        <label className="label-mono">TA</label>
                         <input 
                           type="text" 
                           value={editingPatient.signosVitales?.ta || ''}
                           onChange={e => setEditingPatient({...editingPatient, signosVitales: {...(editingPatient.signosVitales || {ta:'',fc:'',fr:'',temp:'',satO2:''}), ta: e.target.value}})}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"
+                          className="modern-input text-center p-2"
                           placeholder="120/80"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">FC</label>
+                        <label className="label-mono">FC</label>
                         <input 
                           type="text" 
                           value={editingPatient.signosVitales?.fc || ''}
                           onChange={e => setEditingPatient({...editingPatient, signosVitales: {...(editingPatient.signosVitales || {ta:'',fc:'',fr:'',temp:'',satO2:''}), fc: e.target.value}})}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"
+                          className="modern-input text-center p-2"
                           placeholder="75 bpm"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">FR</label>
+                        <label className="label-mono">FR</label>
                         <input 
                           type="text" 
                           value={editingPatient.signosVitales?.fr || ''}
                           onChange={e => setEditingPatient({...editingPatient, signosVitales: {...(editingPatient.signosVitales || {ta:'',fc:'',fr:'',temp:'',satO2:''}), fr: e.target.value}})}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"
+                          className="modern-input text-center p-2"
                           placeholder="18 rpm"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Temp</label>
+                        <label className="label-mono">Temp</label>
                         <input 
                           type="text" 
                           value={editingPatient.signosVitales?.temp || ''}
                           onChange={e => setEditingPatient({...editingPatient, signosVitales: {...(editingPatient.signosVitales || {ta:'',fc:'',fr:'',temp:'',satO2:''}), temp: e.target.value}})}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"
+                          className="modern-input text-center p-2"
                           placeholder="36.5 °C"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SatO2</label>
+                        <label className="label-mono">SatO2</label>
                         <input 
                           type="text" 
                           value={editingPatient.signosVitales?.satO2 || ''}
                           onChange={e => setEditingPatient({...editingPatient, signosVitales: {...(editingPatient.signosVitales || {ta:'',fc:'',fr:'',temp:'',satO2:''}), satO2: e.target.value}})}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none"
+                          className="modern-input text-center p-2"
                           placeholder="98%"
                         />
                       </div>
@@ -1157,7 +1235,7 @@ export default function App() {
                         rows={3}
                         value={editingPatient.habitusExterior || ''}
                         onChange={e => setEditingPatient({...editingPatient, habitusExterior: e.target.value})}
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        className="modern-textarea"
                         placeholder="Estado nutricional y fragilidad..."
                       />
                     </div>
@@ -1167,7 +1245,7 @@ export default function App() {
                         rows={3}
                         value={editingPatient.viaAerea || ''}
                         onChange={e => setEditingPatient({...editingPatient, viaAerea: e.target.value})}
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        className="modern-textarea"
                         placeholder="Mallampati, apertura bucal, distancia tiromentoniana..."
                       />
                     </div>
@@ -1177,7 +1255,7 @@ export default function App() {
                         rows={4}
                         value={editingPatient.abdomen || ''}
                         onChange={e => setEditingPatient({...editingPatient, abdomen: e.target.value})}
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        className="modern-textarea"
                         placeholder="Inspección, auscultación, palpación (Murphy, McBurney, rebote) y percusión..."
                       />
                     </div>
@@ -1194,7 +1272,7 @@ export default function App() {
                         rows={3}
                         value={editingPatient.laboratorio || ''}
                         onChange={e => setEditingPatient({...editingPatient, laboratorio: e.target.value})}
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        className="modern-textarea"
                         placeholder="Hemoglobina, TP/TPT, Creatinina..."
                       />
                     </div>
@@ -1204,7 +1282,7 @@ export default function App() {
                         rows={3}
                         value={editingPatient.gabinete || ''}
                         onChange={e => setEditingPatient({...editingPatient, gabinete: e.target.value})}
-                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                        className="modern-textarea"
                         placeholder="Interpretación de TAC, Ultrasonido o Rx de Tórax..."
                       />
                     </div>
@@ -1213,15 +1291,17 @@ export default function App() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
                       <label className="label-mono">Riesgo Quirúrgico (ASA)</label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-3">
                         {['ASA I', 'ASA II', 'ASA III', 'ASA IV', 'ASA V'].map(asa => (
                           <button
                             key={asa}
                             type="button"
                             onClick={() => setEditingPatient({...editingPatient, asa})}
                             className={cn(
-                              "p-3 rounded-lg text-xs font-bold border transition-all",
-                              editingPatient.asa === asa ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-200 text-slate-500 hover:border-blue-300"
+                              "p-4 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all active:scale-95",
+                              editingPatient.asa === asa 
+                                ? "bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/20" 
+                                : "bg-slate-50 border-slate-100 text-slate-400 hover:border-brand-primary/30"
                             )}
                           >
                             {asa}
@@ -1231,13 +1311,16 @@ export default function App() {
                     </div>
                     <div className="space-y-4">
                       <label className="label-mono">Escala de Goldman</label>
-                      <input 
-                        type="text" 
-                        value={editingPatient.goldman || ''}
-                        onChange={e => setEditingPatient({...editingPatient, goldman: e.target.value})}
-                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-                        placeholder="Clase I, II, III o IV..."
-                      />
+                      <div className="relative">
+                        <Activity size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+                        <input 
+                          type="text" 
+                          value={editingPatient.goldman || ''}
+                          onChange={e => setEditingPatient({...editingPatient, goldman: e.target.value})}
+                          className="modern-input pl-12"
+                          placeholder="Clase I, II, III o IV..."
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1274,13 +1357,13 @@ export default function App() {
             <button 
               type="button"
               onClick={() => { setEditingPatient(null); setActiveTab('pacientes'); }}
-              className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+              className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] hover:text-slate-600 transition-colors"
             >
               Cancelar
             </button>
             <button 
               type="submit"
-              className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+              className="flex items-center gap-3 px-10 py-5 bg-brand-primary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-brand-primary/90 shadow-xl shadow-brand-primary/20 transition-all active:scale-95"
             >
               <Save size={18} /> Guardar Historial
             </button>
@@ -1295,7 +1378,7 @@ export default function App() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="p-8 border-none shadow-md">
           <div className="flex items-center gap-6 mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-blue-500/20">
+            <div className="w-20 h-20 rounded-2xl bg-brand-primary flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-brand-primary/20">
               {userRole === 'admin' ? 'DRA' : 'AS'}
             </div>
             <div>
@@ -1311,18 +1394,18 @@ export default function App() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="label-mono">Cédula Profesional</label>
-                <input type="text" defaultValue={userRole === 'admin' ? '12345678' : 'AS-987654'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <input type="text" defaultValue={userRole === 'admin' ? '12345678' : 'AS-987654'} className="modern-input" />
               </div>
               <div className="space-y-2">
                 <label className="label-mono">Especialidad</label>
-                <input type="text" defaultValue={userRole === 'admin' ? 'Cirugía General' : 'Administración Médica'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <input type="text" defaultValue={userRole === 'admin' ? 'Cirugía General' : 'Administración Médica'} className="modern-input" />
               </div>
             </div>
             <div className="space-y-2">
               <label className="label-mono">Correo Electrónico</label>
-              <input type="email" defaultValue={userRole === 'admin' ? 'dra.bribiesca@hospital.com' : 'sandra.santiago@hospital.com'} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+              <input type="email" defaultValue={userRole === 'admin' ? 'dra.bribiesca@hospital.com' : 'sandra.santiago@hospital.com'} className="modern-input" />
             </div>
-            <button className="w-full py-4 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+            <button className="w-full py-5 bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-brand-secondary/90 transition-all shadow-xl shadow-brand-secondary/20 active:scale-95">
               Actualizar Perfil
             </button>
           </div>
@@ -1344,7 +1427,7 @@ export default function App() {
                 </div>
                 <div className={cn(
                   "w-12 h-6 rounded-full p-1 transition-all cursor-pointer",
-                  setting.active ? "bg-blue-600" : "bg-slate-300"
+                  setting.active ? "bg-brand-primary" : "bg-slate-300"
                 )}>
                   <div className={cn(
                     "w-4 h-4 bg-white rounded-full transition-all",
@@ -1385,13 +1468,18 @@ export default function App() {
         className="max-w-md w-full"
       >
         <Card className="p-10 text-center shadow-2xl border-none">
-          <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-8 shadow-xl shadow-blue-500/30">
-            <Stethoscope size={40} />
+          <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-brand-primary/20 overflow-hidden border-4 border-brand-primary/10">
+            <img 
+              src="https://w7.pngwing.com/pngs/590/717/png-transparent-medicine-medical-purple-violet-logo.png" 
+              alt="Logo Medico Cirujano" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">
-            CIRUJANO<span className="text-blue-600">IA</span>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-2 uppercase">
+            MEDICO<span className="text-brand-primary">CIRUJANO</span>
           </h1>
-          <p className="text-slate-500 text-sm mb-10 font-medium">Asistente Médico Quirúrgico Inteligente</p>
+          <p className="text-slate-500 text-xs mb-10 font-black uppercase tracking-[0.3em]">Asistente Médico Quirúrgico IA</p>
           
           <div className="space-y-4">
             <button 
@@ -1399,7 +1487,7 @@ export default function App() {
               className="w-full group flex items-center justify-between p-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg"
             >
               <div className="flex items-center gap-4">
-                <div className="p-2 bg-white/10 rounded-lg group-hover:bg-blue-500 transition-colors">
+                <div className="p-2 bg-white/10 rounded-lg group-hover:bg-brand-primary transition-colors">
                   <ShieldAlert size={20} />
                 </div>
                 <div className="text-left">
@@ -1412,18 +1500,18 @@ export default function App() {
 
             <button 
               onClick={() => handleLogin('asistente')}
-              className="w-full group flex items-center justify-between p-5 bg-white border-2 border-slate-100 text-slate-900 rounded-2xl font-bold hover:border-blue-500 transition-all active:scale-95 shadow-sm"
+              className="w-full group flex items-center justify-between p-5 bg-white border-2 border-slate-100 text-slate-900 rounded-2xl font-bold hover:border-brand-primary transition-all active:scale-95 shadow-sm"
             >
               <div className="flex items-center gap-4">
-                <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-blue-50 transition-colors">
-                  <Users size={20} className="text-blue-600" />
+                <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-brand-primary/10 transition-colors">
+                  <Users size={20} className="text-brand-primary" />
                 </div>
                 <div className="text-left">
                   <p className="text-sm">Rol Asistente</p>
                   <p className="text-[10px] text-slate-500 font-normal uppercase tracking-widest">Gestión y Consultas</p>
                 </div>
               </div>
-              <ChevronRight size={18} className="opacity-30 group-hover:opacity-100 transition-opacity text-blue-600" />
+              <ChevronRight size={18} className="opacity-30 group-hover:opacity-100 transition-opacity text-brand-primary" />
             </button>
           </div>
 
@@ -1456,8 +1544,13 @@ export default function App() {
         className="hidden md:flex flex-col bg-brand-primary m-6 rounded-[32px] shadow-2xl shadow-brand-primary/20 z-30 relative overflow-hidden"
       >
         <div className="h-24 flex items-center justify-center border-b border-white/10">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-primary shadow-lg">
-            <Stethoscope size={24} />
+          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden border-2 border-white/20">
+            <img 
+              src="https://w7.pngwing.com/pngs/590/717/png-transparent-medicine-medical-purple-violet-logo.png" 
+              alt="Logo" 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
           </div>
         </div>
 
@@ -1588,11 +1681,11 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'dashboard' && <MetricsView />}
-              {activeTab === 'agenda' && <AgendaView />}
-              {activeTab === 'pacientes' && <PatientsView />}
-              {activeTab === 'historial' && <ClinicalHistoryView />}
-              {activeTab === 'perfil' && <ProfileView />}
+              {activeTab === 'dashboard' && MetricsView()}
+              {activeTab === 'agenda' && AgendaView()}
+              {activeTab === 'pacientes' && PatientsView()}
+              {activeTab === 'historial' && ClinicalHistoryView()}
+              {activeTab === 'perfil' && ProfileView()}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -1614,6 +1707,56 @@ export default function App() {
               <p className="font-bold text-sm">Operación Exitosa</p>
               <p className="text-[10px] text-white/50 uppercase tracking-widest">Base de datos actualizada</p>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PWA Install Popup */}
+      <AnimatePresence>
+        {showInstallPopup && (
+          <motion.div 
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            className="fixed bottom-8 left-8 right-8 md:left-auto md:right-8 md:w-96 bg-white rounded-[32px] shadow-2xl border border-slate-100 p-8 z-[100] overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-2 bg-brand-primary" />
+            <div className="flex items-start gap-6">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shrink-0 shadow-inner border border-slate-100 overflow-hidden">
+                <img 
+                  src="https://w7.pngwing.com/pngs/590/717/png-transparent-medicine-medical-purple-violet-logo.png" 
+                  alt="App Icon" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight">Instalar Aplicación</h4>
+                <p className="text-xs text-slate-500 font-bold mt-1 uppercase tracking-widest">Medico Cirujano</p>
+                <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">Accede más rápido y trabaja sin conexión instalando el dashboard en tu dispositivo.</p>
+                
+                <div className="flex items-center gap-3 mt-6">
+                  <button 
+                    onClick={() => setShowInstallPopup(false)}
+                    className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    Después
+                  </button>
+                  <button 
+                    onClick={handleInstallClick}
+                    className="flex-[2] py-3 bg-brand-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand-primary/20 hover:bg-brand-primary/90 transition-all active:scale-95"
+                  >
+                    Instalar Ahora
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowInstallPopup(false)}
+              className="absolute top-4 right-4 text-slate-300 hover:text-slate-500 transition-colors"
+            >
+              <X size={20} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
