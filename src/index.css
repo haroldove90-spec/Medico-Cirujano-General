@@ -18,6 +18,7 @@
 @layer base {
   body {
     @apply bg-brand-bg text-brand-text font-sans antialiased;
+    accent-color: var(--color-brand-primary);
   }
 }
 

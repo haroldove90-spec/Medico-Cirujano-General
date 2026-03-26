@@ -131,6 +131,76 @@ const MOCK_DATA: Patient[] = [
 
 // --- Sub-Components ---
 
+const ActionMenu = ({ 
+  patient, 
+  module, 
+  activeMenu, 
+  setActiveMenu, 
+  handleEdit, 
+  handleDelete, 
+  exportToPDF, 
+  userRole 
+}: { 
+  patient: Patient; 
+  module: string;
+  activeMenu: string | null;
+  setActiveMenu: (val: string | null) => void;
+  handleEdit: (p: Patient) => void;
+  handleDelete: (id: string) => void;
+  exportToPDF: (title: string) => void;
+  userRole: UserRole;
+}) => {
+  const menuId = `${module}-${patient.id}`;
+  const isOpen = activeMenu === menuId;
+
+  return (
+    <div className="relative">
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          setActiveMenu(isOpen ? null : menuId);
+        }}
+        className="p-2 text-slate-400 hover:text-brand-primary transition-colors rounded-full hover:bg-slate-100"
+      >
+        <MoreVertical size={18} />
+      </button>
+      {isOpen && (
+        <div 
+          className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden animate-in fade-in zoom-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button 
+            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Eye size={16} className="text-brand-primary" /> Ver Detalle
+          </button>
+          <button 
+            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Edit2 size={16} className="text-amber-500" /> Editar Registro
+          </button>
+          <button 
+            onClick={() => { exportToPDF(`Registro_${patient.nombre}`); setActiveMenu(null); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <Download size={16} className="text-emerald-500" /> Guardar (PDF)
+          </button>
+          {userRole === 'admin' && (
+            <button 
+              onClick={() => { handleDelete(patient.id); setActiveMenu(null); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} /> Borrar Registro
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Card = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <div className={cn("modern-card p-6", className)}>
     {children}
@@ -167,6 +237,8 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPopup, setShowInstallPopup] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Moved from CalendarComponent
+  const [clinicalSearchTerm, setClinicalSearchTerm] = useState(''); // Moved from ClinicalHistoryView
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -229,7 +301,7 @@ export default function App() {
       { id: 'dashboard', roles: ['admin', 'asistente'] },
       { id: 'agenda', roles: ['admin', 'asistente'] },
       { id: 'pacientes', roles: ['admin', 'asistente'] },
-      { id: 'historial', roles: ['admin'] },
+      { id: 'historial', roles: ['admin', 'asistente'] },
       { id: 'perfil', roles: ['admin', 'asistente'] },
     ];
     
@@ -255,50 +327,6 @@ export default function App() {
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 3000);
   };
-
-  const ActionMenu = ({ patient, module }: { patient: Patient, module: string }) => (
-    <div className="relative">
-      <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          setActiveMenu(activeMenu === `${module}-${patient.id}` ? null : `${module}-${patient.id}`);
-        }}
-        className="p-2 text-slate-400 hover:text-brand-primary transition-colors rounded-full hover:bg-slate-100"
-      >
-        <MoreVertical size={18} />
-      </button>
-      {activeMenu === `${module}-${patient.id}` && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 py-2 overflow-hidden animate-in fade-in zoom-in duration-200">
-          <button 
-            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Eye size={16} className="text-brand-primary" /> Ver Detalle
-          </button>
-          <button 
-            onClick={() => { handleEdit(patient); setActiveMenu(null); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Edit2 size={16} className="text-amber-500" /> Editar Registro
-          </button>
-          <button 
-            onClick={() => { exportToPDF(`Registro_${patient.nombre}`); setActiveMenu(null); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Download size={16} className="text-emerald-500" /> Guardar (PDF)
-          </button>
-          {userRole === 'admin' && (
-            <button 
-              onClick={() => { handleDelete(patient.id); setActiveMenu(null); }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 size={16} /> Borrar Registro
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   // PDF Export
   const exportToPDF = (title: string = 'Listado de Pacientes', data?: any[][], headers?: string[]) => {
@@ -381,9 +409,9 @@ export default function App() {
   const MetricsView = () => {
     const stats = [
       { label: 'Pacientes Totales', value: patients.length, icon: Users, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
-      { label: 'Cirugías Mes', value: '12', icon: Activity, color: 'bg-brand-secondary', textColor: 'text-brand-secondary' },
+      { label: 'Cirugías Mes', value: '12', icon: Activity, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
       { label: 'Riesgo Alto', value: patients.filter(p => p.prioridad === 'alta').length, icon: ShieldAlert, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
-      { label: 'Citas Hoy', value: patients.filter(p => p.proximaCita?.startsWith(new Date().toISOString().split('T')[0])).length, icon: Clock, color: 'bg-brand-secondary', textColor: 'text-brand-secondary' },
+      { label: 'Citas Hoy', value: patients.filter(p => p.proximaCita?.startsWith(new Date().toISOString().split('T')[0])).length, icon: Clock, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
     ];
 
     return (
@@ -399,27 +427,27 @@ export default function App() {
                     <stat.icon size={20} />
                   </div>
                 </div>
-                <h3 className="text-4xl sm:text-5xl font-black text-brand-secondary tracking-tighter">{stat.value}</h3>
+                <h3 className="text-4xl sm:text-5xl font-black text-brand-primary tracking-tighter">{stat.value}</h3>
               </Card>
             ))}
           </div>
 
           <div className="space-y-8">
             <Card className="p-8">
-              <h3 className="text-lg font-black text-brand-secondary uppercase tracking-tight mb-6">Equipo Médico</h3>
+              <h3 className="text-lg font-black text-brand-primary uppercase tracking-tight mb-6">Equipo Médico</h3>
               <div className="flex items-center gap-4 overflow-x-auto pb-2 custom-scrollbar">
                 {[
                   { name: 'Johana', role: 'Admin', color: 'bg-brand-primary' },
-                  { name: 'Sandra', role: 'Asistente', color: 'bg-brand-secondary' },
+                  { name: 'Sandra', role: 'Asistente', color: 'bg-brand-primary' },
                   { name: 'Carlos', role: 'Enfermero', color: 'bg-brand-accent' },
                   { name: 'Lucía', role: 'Anestesista', color: 'bg-brand-primary' },
-                  { name: 'Miguel', role: 'Residente', color: 'bg-brand-secondary' },
+                  { name: 'Miguel', role: 'Residente', color: 'bg-brand-primary' },
                 ].map((member, i) => (
                   <div key={i} className="flex flex-col items-center shrink-0">
                     <div className={cn("w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-black shadow-lg mb-2", member.color)}>
                       {member.name[0]}
                     </div>
-                    <p className="text-[10px] font-black text-brand-secondary uppercase">{member.name}</p>
+                    <p className="text-[10px] font-black text-brand-primary uppercase">{member.name}</p>
                     <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{member.role}</p>
                   </div>
                 ))}
@@ -429,8 +457,8 @@ export default function App() {
             <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-6">
               {[
                 { label: 'Agenda', icon: Calendar, color: 'bg-brand-primary', id: 'agenda' },
-                { label: 'Pacientes', icon: Users, color: 'bg-brand-secondary', id: 'pacientes' },
-                { label: 'Historial', icon: FileText, color: 'bg-brand-secondary', id: 'historial' },
+                { label: 'Pacientes', icon: Users, color: 'bg-brand-primary', id: 'pacientes' },
+                { label: 'Historial', icon: FileText, color: 'bg-brand-primary', id: 'historial' },
                 { label: 'Perfil', icon: Settings, color: 'bg-brand-primary', id: 'perfil' },
                 ...(userRole === 'asistente' ? [{ label: 'Nueva Cita', icon: Plus, color: 'bg-brand-primary', id: 'agenda', action: () => { setActiveTab('agenda'); setIsAddingAppointment(true); } }] : [])
               ].filter(d => d.id !== 'historial' || userRole === 'admin').map((device, i) => (
@@ -442,7 +470,7 @@ export default function App() {
                   <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform", device.color)}>
                     <device.icon size={24} />
                   </div>
-                  <p className="text-[10px] font-black text-brand-secondary uppercase tracking-widest">{device.label}</p>
+                  <p className="text-[10px] font-black text-brand-primary uppercase tracking-widest">{device.label}</p>
                 </button>
               ))}
             </div>
@@ -453,8 +481,6 @@ export default function App() {
   };
 
   const CalendarComponent = () => {
-    const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Marzo 2026
-    
     const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
     const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
     
@@ -762,7 +788,16 @@ export default function App() {
               </div>
               <div className="flex items-center gap-4">
                 <Badge variant={p.prioridad}>{p.prioridad}</Badge>
-                {ActionMenu({ patient: p, module: 'agenda' })}
+                <ActionMenu 
+                  patient={p} 
+                  module="agenda" 
+                  activeMenu={activeMenu}
+                  setActiveMenu={setActiveMenu}
+                  handleEdit={handleEdit}
+                  handleDelete={handleDelete}
+                  exportToPDF={exportToPDF}
+                  userRole={userRole}
+                />
               </div>
             </div>
           ))}
@@ -797,7 +832,7 @@ export default function App() {
             >
               <Download size={18} /> Exportar PDF
             </button>
-            {userRole === 'admin' && (
+            {(userRole === 'admin' || userRole === 'asistente') && (
               <button 
                 onClick={() => {
                   setEditingPatient({ 
@@ -866,7 +901,16 @@ export default function App() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {ActionMenu({ patient: p, module: 'pacientes' })}
+                      <ActionMenu 
+                        patient={p} 
+                        module="pacientes" 
+                        activeMenu={activeMenu}
+                        setActiveMenu={setActiveMenu}
+                        handleEdit={handleEdit}
+                        handleDelete={handleDelete}
+                        exportToPDF={exportToPDF}
+                        userRole={userRole}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -886,11 +930,9 @@ export default function App() {
   };
 
   const ClinicalHistoryView = () => {
-    const [searchTerm, setSearchTerm] = useState('');
-    
     const filteredPatients = patients.filter(p => 
-      p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.diagnostico.toLowerCase().includes(searchTerm.toLowerCase())
+      p.nombre.toLowerCase().includes(clinicalSearchTerm.toLowerCase()) || 
+      p.diagnostico.toLowerCase().includes(clinicalSearchTerm.toLowerCase())
     );
 
     if (!editingPatient) return (
@@ -945,8 +987,8 @@ export default function App() {
               <input 
                 type="text" 
                 placeholder="Buscar por nombre o diagnóstico..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={clinicalSearchTerm}
+                onChange={(e) => setClinicalSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-brand-primary/20"
               />
             </div>
@@ -990,9 +1032,7 @@ export default function App() {
       </div>
     );
 
-    const tabs = userRole === 'admin' 
-      ? ['A. Identificación', 'B. Padecimiento', 'C. Exploración', 'D. Diagnóstico y Plan']
-      : ['A. Identificación'];
+    const tabs = ['A. Identificación', 'B. Padecimiento', 'C. Exploración', 'D. Diagnóstico y Plan'];
 
     return (
       <Card className="p-0">
@@ -1405,7 +1445,7 @@ export default function App() {
               <label className="label-mono">Correo Electrónico</label>
               <input type="email" defaultValue={userRole === 'admin' ? 'dra.bribiesca@hospital.com' : 'sandra.santiago@hospital.com'} className="modern-input" />
             </div>
-            <button className="w-full py-5 bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-brand-secondary/90 transition-all shadow-xl shadow-brand-secondary/20 active:scale-95">
+            <button className="w-full py-5 bg-brand-primary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-brand-primary/90 transition-all shadow-xl shadow-brand-primary/20 active:scale-95">
               Actualizar Perfil
             </button>
           </div>
@@ -1476,8 +1516,8 @@ export default function App() {
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-2 uppercase">
-            MEDICO<span className="text-brand-primary">CIRUJANO</span>
+          <h1 className="text-3xl font-black text-slate-900 mb-2 uppercase">
+            MEDICO <span className="text-brand-primary">CIRUJANO</span>
           </h1>
           <p className="text-slate-500 text-xs mb-10 font-black uppercase tracking-[0.3em]">Asistente Médico Quirúrgico IA</p>
           
@@ -1529,7 +1569,7 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'asistente'] },
     { id: 'agenda', label: 'Agenda', icon: Calendar, roles: ['admin', 'asistente'] },
     { id: 'pacientes', label: 'Pacientes', icon: Users, roles: ['admin', 'asistente'] },
-    { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin'] },
+    { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin', 'asistente'] },
     { id: 'perfil', label: 'Perfil y Config', icon: Settings, roles: ['admin', 'asistente'] },
   ].filter(item => item.roles.includes(userRole));
 
@@ -1641,7 +1681,7 @@ export default function App() {
         {/* Header */}
         <header className="flex items-center justify-between mb-10">
           <div>
-            <h1 className="text-4xl font-black text-brand-secondary tracking-tighter">
+            <h1 className="text-4xl font-black text-brand-primary tracking-tighter">
               Hola, <span className="text-brand-primary">{userRole === 'admin' ? 'Dra. Johana' : 'Sandra'}!</span>
             </h1>
             <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-1">Bienvenida de nuevo al sistema</p>
@@ -1664,7 +1704,7 @@ export default function App() {
               <button className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 shadow-sm hover:text-brand-primary transition-all">
                 <Settings size={20} />
               </button>
-              <div className="w-12 h-12 rounded-2xl bg-brand-secondary flex items-center justify-center text-white shadow-lg overflow-hidden">
+              <div className="w-12 h-12 rounded-2xl bg-brand-primary flex items-center justify-center text-white shadow-lg overflow-hidden">
                 <User size={24} />
               </div>
             </div>
@@ -1698,9 +1738,9 @@ export default function App() {
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className="fixed bottom-8 right-8 bg-brand-secondary text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50"
+            className="fixed bottom-8 right-8 bg-brand-primary text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50"
           >
-            <div className="w-8 h-8 bg-brand-primary rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <CheckCircle2 size={18} />
             </div>
             <div>
