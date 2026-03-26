@@ -129,7 +129,7 @@ const MOCK_DATA: Patient[] = [
 // --- Sub-Components ---
 
 const Card = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <div className={cn("bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden", className)}>
+  <div className={cn("modern-card p-6", className)}>
     {children}
   </div>
 );
@@ -246,9 +246,11 @@ export default function App() {
       });
 
       doc.save(`${title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
     } catch (error) {
       console.error('Error al exportar PDF:', error);
-      alert('Hubo un error al generar el PDF. Por favor, intente de nuevo.');
+      // No alert in iframe
     }
   };
 
@@ -294,109 +296,74 @@ export default function App() {
 
   // Views
   const MetricsView = () => {
-    const totalPatients = patients.length;
-    const highRisk = patients.filter(p => p.asa === 'ASA III' || p.asa === 'ASA IV').length;
-    const today = new Date().toISOString().split('T')[0];
-    const todayAppointments = patients.filter(p => p.proximaCita?.startsWith(today)).length;
-    const monthPatients = patients.filter(p => {
-      const date = p.fechaIngreso || '';
-      return date.startsWith('2026-03'); // Hardcoded for demo month
-    }).length;
-
     const stats = [
-      { label: 'Total Pacientes', value: totalPatients.toString().padStart(2, '0'), icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-      { label: 'Ingresos Mes', value: monthPatients.toString().padStart(2, '0'), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-      { label: 'Riesgos Altos', value: highRisk.toString().padStart(2, '0'), icon: ShieldAlert, color: 'text-red-600', bg: 'bg-red-50' },
-      { label: 'Citas Hoy', value: todayAppointments.toString().padStart(2, '0'), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+      { label: 'Pacientes Totales', value: patients.length, icon: Users, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
+      { label: 'Cirugías Mes', value: '12', icon: Activity, color: 'bg-brand-secondary', textColor: 'text-brand-secondary' },
+      { label: 'Riesgo Alto', value: patients.filter(p => p.prioridad === 'alta').length, icon: ShieldAlert, color: 'bg-brand-primary', textColor: 'text-brand-primary' },
+      { label: 'Citas Hoy', value: patients.filter(p => p.proximaCita?.startsWith(new Date().toISOString().split('T')[0])).length, icon: Clock, color: 'bg-brand-secondary', textColor: 'text-brand-secondary' },
     ];
 
     return (
-      <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, i) => (
-            <motion.div 
-              key={i} 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: i * 0.1 }}
-            >
-              <Card className="p-6 hover:shadow-lg transition-all cursor-default group border-none shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={cn("p-3 rounded-xl transition-transform group-hover:scale-110", stat.bg, stat.color)}>
-                    <stat.icon size={24} />
+      <div className="space-y-10">
+        {/* Top Stats Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-6">
+            {stats.map((stat, i) => (
+              <Card key={i} className="flex flex-col justify-between h-48 p-8 hover:scale-105 transition-transform cursor-default">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-400">{stat.label}</p>
+                  <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg", stat.color)}>
+                    <stat.icon size={20} />
                   </div>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">En Vivo</span>
                 </div>
-                <p className="text-4xl font-black text-slate-900 mb-1 tracking-tighter">{stat.value}</p>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                <h3 className="text-5xl font-black text-brand-secondary tracking-tighter">{stat.value}</h3>
               </Card>
-            </motion.div>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2 p-8 border-none shadow-md">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Actividad Quirúrgica</h3>
-                <p className="text-xs text-slate-500 font-bold">Distribución de procedimientos por día</p>
-              </div>
-              <div className="flex gap-2">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
-                  <span className="w-2 h-2 rounded-full bg-blue-500" /> Realizadas
-                </span>
-              </div>
-            </div>
-            <div className="h-64 flex items-end justify-between gap-3 px-4">
-              {[40, 70, 45, 90, 65, 85, 55, 60, 75, 50].map((h, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-3">
-                  <div className="relative w-full group">
-                    <motion.div 
-                      initial={{ height: 0 }}
-                      animate={{ height: `${h}%` }}
-                      className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg shadow-lg shadow-blue-500/20"
-                    />
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                      {h}%
-                    </div>
-                  </div>
-                  <span className="text-[9px] text-slate-400 font-black uppercase">M{i+1}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+            ))}
+          </div>
 
-          <Card className="p-8 border-none shadow-md bg-slate-900 text-white">
-            <h3 className="text-lg font-black uppercase tracking-tight mb-6">Próximas Cirugías</h3>
-            <div className="space-y-6">
-              {patients.slice(0, 4).map((p, i) => (
-                <div key={i} className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
-                  <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                    <Activity size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold truncate">{p.nombre}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase truncate">{p.diagnostico}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Clock size={10} className="text-blue-400" />
-                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">{p.proximaCita?.split(' ')[1]}</span>
+          <div className="space-y-8">
+            <Card className="p-8">
+              <h3 className="text-lg font-black text-brand-secondary uppercase tracking-tight mb-6">Equipo Médico</h3>
+              <div className="flex items-center gap-4 overflow-x-auto pb-2 custom-scrollbar">
+                {[
+                  { name: 'Johana', role: 'Admin', color: 'bg-brand-primary' },
+                  { name: 'Sandra', role: 'Asistente', color: 'bg-brand-secondary' },
+                  { name: 'Carlos', role: 'Enfermero', color: 'bg-brand-accent' },
+                  { name: 'Lucía', role: 'Anestesista', color: 'bg-brand-primary' },
+                  { name: 'Miguel', role: 'Residente', color: 'bg-brand-secondary' },
+                ].map((member, i) => (
+                  <div key={i} className="flex flex-col items-center shrink-0">
+                    <div className={cn("w-14 h-14 rounded-full flex items-center justify-center text-white text-lg font-black shadow-lg mb-2", member.color)}>
+                      {member.name[0]}
                     </div>
+                    <p className="text-[10px] font-black text-brand-secondary uppercase">{member.name}</p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{member.role}</p>
                   </div>
-                </div>
+                ))}
+              </div>
+            </Card>
+
+            <div className="grid grid-cols-2 gap-6">
+              {[
+                { label: 'Agenda', icon: Calendar, color: 'bg-brand-primary', id: 'agenda' },
+                { label: 'Pacientes', icon: Users, color: 'bg-brand-secondary', id: 'pacientes' },
+                { label: 'Historial', icon: FileText, color: 'bg-brand-secondary', id: 'historial' },
+                { label: 'Perfil', icon: Settings, color: 'bg-brand-primary', id: 'perfil' },
+                ...(userRole === 'asistente' ? [{ label: 'Nueva Cita', icon: Plus, color: 'bg-brand-primary', id: 'agenda', action: () => { setActiveTab('agenda'); setIsAddingAppointment(true); } }] : [])
+              ].filter(d => d.id !== 'historial' || userRole === 'admin').map((device, i) => (
+                <button 
+                  key={i} 
+                  onClick={() => device.action ? device.action() : setActiveTab(device.id)}
+                  className="modern-card p-6 flex flex-col items-center justify-center gap-4 hover:scale-105 transition-all group"
+                >
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform", device.color)}>
+                    <device.icon size={24} />
+                  </div>
+                  <p className="text-[10px] font-black text-brand-secondary uppercase tracking-widest">{device.label}</p>
+                </button>
               ))}
-              {patients.length === 0 && (
-                <div className="text-center py-12 opacity-50">
-                  <p className="text-xs font-bold uppercase tracking-widest">Sin cirugías programadas</p>
-                </div>
-              )}
             </div>
-            <button 
-              onClick={() => setActiveTab('agenda')}
-              className="w-full mt-8 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-            >
-              Ver Agenda Completa
-            </button>
-          </Card>
+          </div>
         </div>
       </div>
     );
@@ -960,23 +927,33 @@ export default function App() {
       </div>
     );
 
-    const tabs = ['A. Identificación', 'B. Padecimiento', 'C. Exploración', 'D. Diagnóstico y Plan'];
+    const tabs = userRole === 'admin' 
+      ? ['A. Identificación', 'B. Padecimiento', 'C. Exploración', 'D. Diagnóstico y Plan']
+      : ['A. Identificación'];
 
     return (
       <Card className="p-0">
-        <div className="bg-slate-50 border-b border-slate-100 flex overflow-x-auto">
-          {tabs.map((t, i) => (
-            <button
-              key={i}
-              onClick={() => setFormTab(i)}
-              className={cn(
-                "px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
-                formTab === i ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-400 hover:text-slate-600"
-              )}
-            >
-              {t}
-            </button>
-          ))}
+        <div className="bg-slate-50 border-b border-slate-100 flex items-center justify-between pr-6">
+          <div className="flex overflow-x-auto">
+            {tabs.map((t, i) => (
+              <button
+                key={i}
+                onClick={() => setFormTab(i)}
+                className={cn(
+                  "px-6 py-4 text-xs font-bold uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
+                  formTab === i ? "border-blue-600 text-blue-600 bg-white" : "border-transparent text-slate-400 hover:text-slate-600"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => exportToPDF(`Historial_${editingPatient.nombre}`)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all"
+          >
+            <Download size={14} /> Exportar PDF
+          </button>
         </div>
         <form onSubmit={handleSavePatient} className="p-8">
           <AnimatePresence mode="wait">
@@ -1460,107 +1437,156 @@ export default function App() {
 
   if (!isLoggedIn) return <LoginView />;
 
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'asistente'] },
+    { id: 'agenda', label: 'Agenda', icon: Calendar, roles: ['admin', 'asistente'] },
+    { id: 'pacientes', label: 'Pacientes', icon: Users, roles: ['admin', 'asistente'] },
+    { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin'] },
+    { id: 'perfil', label: 'Perfil y Config', icon: Settings, roles: ['admin', 'asistente'] },
+  ].filter(item => item.roles.includes(userRole));
+
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Sidebar */}
-      <aside className={cn(
-        "bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20",
-        sidebarOpen ? "w-64" : "w-20"
-      )}>
-        <div className="h-20 flex items-center px-6 border-b border-slate-100">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shrink-0">
-            <Stethoscope size={20} />
+    <div className="flex min-h-screen bg-brand-bg font-sans text-brand-text overflow-hidden">
+      {/* Sidebar - Desktop */}
+      <motion.aside 
+        initial={false}
+        animate={{ width: sidebarOpen ? 280 : 100 }}
+        onMouseEnter={() => setSidebarOpen(true)}
+        onMouseLeave={() => setSidebarOpen(false)}
+        className="hidden md:flex flex-col bg-brand-primary m-6 rounded-[32px] shadow-2xl shadow-brand-primary/20 z-30 relative overflow-hidden"
+      >
+        <div className="h-24 flex items-center justify-center border-b border-white/10">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-primary shadow-lg">
+            <Stethoscope size={24} />
           </div>
-          {sidebarOpen && <span className="ml-3 font-black text-lg tracking-tighter uppercase">MÉDICO<span className="text-blue-600"> CIRUJANO GRAL.</span></span>}
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'asistente'] },
-            { id: 'agenda', label: 'Agenda', icon: Calendar, roles: ['admin', 'asistente'] },
-            { id: 'pacientes', label: 'Pacientes', icon: Users, roles: ['admin', 'asistente'] },
-            { id: 'historial', label: 'Historial Clínico', icon: FileText, roles: ['admin'] },
-            { id: 'perfil', label: 'Perfil y Config', icon: Settings, roles: ['admin', 'asistente'] },
-          ].filter(item => item.roles.includes(userRole)).map((item) => (
+        <nav className="flex-1 py-8 px-4 space-y-4">
+          {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={cn(
-                "w-full flex items-center p-3 rounded-xl transition-all group",
+                "w-full flex items-center p-4 rounded-2xl transition-all duration-300 group relative",
                 activeTab === item.id 
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-white text-brand-primary shadow-xl" 
+                  : "text-white/70 hover:text-white hover:bg-white/10"
               )}
             >
-              <item.icon size={20} className={cn("shrink-0", activeTab === item.id ? "text-white" : "group-hover:text-blue-600")} />
-              {sidebarOpen && <span className="ml-3 text-sm font-bold">{item.label}</span>}
-              {activeTab === item.id && sidebarOpen && <ChevronRight size={14} className="ml-auto opacity-50" />}
+              <item.icon size={24} className="shrink-0" />
+              <AnimatePresence>
+                {sidebarOpen && (
+                  <motion.span 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="ml-4 text-sm font-black uppercase tracking-widest whitespace-nowrap"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+              {activeTab === item.id && (
+                <motion.div 
+                  layoutId="active-pill"
+                  className="absolute left-0 w-1 h-8 bg-brand-primary rounded-r-full"
+                />
+              )}
             </button>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-100">
-          <div className={cn("flex items-center p-3 rounded-xl bg-slate-50 border border-slate-100", !sidebarOpen && "justify-center")}>
+        <div className="p-4 border-t border-white/10">
+          <div className={cn("flex items-center p-3 rounded-2xl bg-white/10 mb-4", !sidebarOpen && "justify-center")}>
             <button 
               onClick={() => setUserRole(userRole === 'admin' ? 'asistente' : 'admin')}
-              className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0 hover:bg-blue-200 transition-colors"
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-brand-primary font-bold text-xs shrink-0 hover:scale-110 transition-transform"
             >
               {userRole === 'admin' ? 'AD' : 'AS'}
             </button>
             {sidebarOpen && (
               <div className="ml-3 overflow-hidden flex-1">
-                <p className="text-xs font-bold text-slate-900 truncate uppercase">{userRole}</p>
-                <p className="text-[10px] text-slate-500 truncate">Click para cambiar</p>
+                <p className="text-[10px] font-black text-white truncate uppercase">{userRole}</p>
+                <p className="text-[8px] text-white/50 truncate uppercase tracking-widest">Cambiar Rol</p>
               </div>
             )}
           </div>
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              handleLogout();
-            }}
-            className={cn(
-              "w-full mt-4 flex items-center p-3 text-slate-400 hover:text-red-600 transition-colors cursor-pointer", 
-              !sidebarOpen && "justify-center"
-            )}
+            onClick={handleLogout}
+            className="w-full flex items-center p-4 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all"
           >
-            <LogOut size={20} />
-            {sidebarOpen && <span className="ml-3 text-sm font-bold">Cerrar Sesión</span>}
+            <LogOut size={24} className="shrink-0" />
+            {sidebarOpen && <span className="ml-4 text-sm font-black uppercase tracking-widest">Salir</span>}
           </button>
         </div>
-      </aside>
+      </motion.aside>
+
+      {/* Bottom Nav - Mobile */}
+      <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-brand-primary rounded-[24px] shadow-2xl shadow-brand-primary/30 z-40 flex items-center justify-around p-2">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={cn(
+              "p-4 rounded-2xl transition-all",
+              activeTab === item.id ? "bg-white text-brand-primary shadow-lg" : "text-white/60"
+            )}
+          >
+            <item.icon size={20} />
+          </button>
+        ))}
+        <button 
+          onClick={handleLogout}
+          className="p-4 text-white/60"
+        >
+          <LogOut size={20} />
+        </button>
+      </nav>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg">
-              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            <h2 className="text-xl font-bold text-slate-900 capitalize">
-              {activeTab.replace('-', ' ')}
-            </h2>
+      <main className="flex-1 flex flex-col h-screen overflow-hidden p-6 md:p-10 md:pl-4">
+        {/* Header */}
+        <header className="flex items-center justify-between mb-10">
+          <div>
+            <h1 className="text-4xl font-black text-brand-secondary tracking-tighter">
+              Hola, <span className="text-brand-primary">{userRole === 'admin' ? 'Dra. Johana' : 'Sandra'}!</span>
+            </h1>
+            <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-1">Bienvenida de nuevo al sistema</p>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-100">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              Sincronizado
+            <div className="hidden md:flex items-center bg-white rounded-full px-6 py-3 shadow-sm border border-slate-100">
+              <Search size={18} className="text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                className="ml-3 bg-transparent outline-none text-sm font-medium w-48"
+              />
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
-              <User size={20} />
+            <div className="flex items-center gap-3">
+              <button className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 shadow-sm hover:text-brand-primary transition-all relative">
+                <Activity size={20} />
+                <span className="absolute top-3 right-3 w-2 h-2 bg-brand-primary rounded-full border-2 border-white" />
+              </button>
+              <button className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 shadow-sm hover:text-brand-primary transition-all">
+                <Settings size={20} />
+              </button>
+              <div className="w-12 h-12 rounded-2xl bg-brand-secondary flex items-center justify-center text-white shadow-lg overflow-hidden">
+                <User size={24} />
+              </div>
             </div>
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto w-full">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-24 md:pb-0">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
             >
               {activeTab === 'dashboard' && <MetricsView />}
               {activeTab === 'agenda' && <AgendaView />}
@@ -1569,8 +1595,8 @@ export default function App() {
               {activeTab === 'perfil' && <ProfileView />}
             </motion.div>
           </AnimatePresence>
-        </main>
-      </div>
+        </div>
+      </main>
 
       {/* Notifications */}
       <AnimatePresence>
@@ -1579,14 +1605,14 @@ export default function App() {
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            className="fixed bottom-8 right-8 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 border border-slate-800"
+            className="fixed bottom-8 right-8 bg-brand-secondary text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50"
           >
-            <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-brand-primary rounded-full flex items-center justify-center">
               <CheckCircle2 size={18} />
             </div>
             <div>
               <p className="font-bold text-sm">Operación Exitosa</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Base de datos actualizada</p>
+              <p className="text-[10px] text-white/50 uppercase tracking-widest">Base de datos actualizada</p>
             </div>
           </motion.div>
         )}
